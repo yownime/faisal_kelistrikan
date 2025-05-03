@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Headlight Simulation</title>
+    <link rel="stylesheet" href="lampu_kepala.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="components-sidebar">
+        <h2>Components</h2>
+        <div
+          class="component battery"
+          draggable="true"
+          data-component="battery"
+        >
+          <div class="battery-icon">
+            <img src="image/batre.png" alt="Battery" width="40" height="24" />
+          </div>
+          <span>Battery</span>
+        </div>
+        <div
+          class="component headlight"
+          draggable="true"
+          data-component="headlight"
+        >
+          <div class="headlight-icon"></div>
+          <span>Headlight</span>
+        </div>
+        <div class="component switch" draggable="true" data-component="switch">
+          <div class="switch-body">
+            <div class="switch-toggle"></div>
+          </div>
+          <span>Switch On/Off</span>
+        </div>
+        <div
+          class="component speedometer"
+          draggable="true"
+          data-component="speedometer"
+        >
+          <div class="speedometer-icon">
+            <div class="speedometer-light"></div>
+          </div>
+          <span>Speedometer Light</span>
+        </div>
+        <div
+          class="component high-beam-switch"
+          draggable="true"
+          data-component="high-beam-switch"
+        >
+          <div class="switch-body">
+            <div class="switch-toggle"></div>
+          </div>
+          <span>Switch Lampu Jauh</span>
+        </div>
+        <div
+          class="component high-beam-indicator"
+          draggable="true"
+          data-component="high-beam-indicator"
+        >
+          <div class="high-beam-icon">
+            <div class="high-beam-light"></div>
+          </div>
+          <span>High Beam Indicator</span>
+        </div>
+        <!-- Tambahkan komponen lain di sini nanti -->
+      </div>
+      <div class="workspace">
+        <h2>Workspace</h2>
+        <div class="workspace-area" id="workspace-area">
+          <div class="workspace-hint">
+            Silahkan klik komponen untuk menambahkan ke workspace
+          </div>
+        </div>
+        <div class="navigation-buttons">
+          <a href="rem.html" class="nav-button prev-button"
+            >← Kembali ke Simulasi Lampu Rem</a
+          >
+        </div>
+      </div>
+    </div>
+    <script src="lampu_kepala.js"></script>
+  </body>
+</html>
