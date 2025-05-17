@@ -13,6 +13,7 @@
       href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
       rel="stylesheet"
     />
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
   </head>
   <body>
     <header class="sub-hero">
@@ -345,11 +346,29 @@
         container.style.display = "none";
         resultsContainer.style.display = "block";
 
-        // Calculate score
+        // Calculate score and round it to whole number
         const correctAnswers = answers.filter(
           (answer, index) => answer === questions[index].correct
         ).length;
-        const score = (correctAnswers / questions.length) * 100;
+        const score = Math.round((correctAnswers / questions.length) * 100);
+        sessionStorage.setItem('quizScore', score);
+
+        // Save results to Excel
+        const userData = JSON.parse(sessionStorage.getItem('userData'));
+        const resultData = {
+            Timestamp: new Date().toLocaleString(),
+            Nama: userData.nama,
+            Kelas: userData.kelas,
+            Jurusan: userData.jurusan,
+            Nilai: score,
+            'Jawaban Benar': correctAnswers,
+            'Total Soal': questions.length
+        };
+
+        // Save to session storage for later use
+        let allResults = JSON.parse(sessionStorage.getItem('quizResults') || '[]');
+        allResults.push(resultData);
+        sessionStorage.setItem('quizResults', JSON.stringify(allResults));
 
         // Display score and review
         scoreDisplay.innerHTML = `
@@ -382,12 +401,8 @@
         document.getElementById("submit-btn").style.display = "none";
         document.getElementById("next-btn").style.display = "none";
         document.getElementById("finish-btn").style.display = "none";
-
-        if (score === 100) {
-          document.getElementById("complete-btn").style.display = "block";
-        } else {
-          document.getElementById("retry-btn").style.display = "block";
-        }
+        document.getElementById("retry-btn").style.display = "block";
+        document.getElementById("complete-btn").style.display = "block"; // Always show complete button
       }
 
       function retryQuiz() {

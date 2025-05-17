@@ -1,84 +1,109 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <title>Simulasi Rangkaian Lampu Sein Motor</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Turn Signal Simulation</title>
     <link rel="stylesheet" href="sein.css" />
   </head>
   <body>
-    <h1>Simulasi Rangkaian Lampu Sein Motor</h1>
-
-    <div class="instructions">
-      <p>
-        Instruksi: Drag komponen ke area kerja, hubungkan titik koneksi dengan
-        klik pada titik koneksi pertama lalu titik koneksi kedua. Klik pada
-        switch untuk mengubah status on/off.
-      </p>
-    </div>
-
-    <div class="components">
-      <div class="component" draggable="true" data-type="battery">
-        <img
-          src="https://3.bp.blogspot.com/-b6Kc7H5MVSo/VGjBgv7_izI/AAAAAAAAACA/pMI9K8pezd0/s1600/Accu%2Ba.jpg"
-          alt="Aki/Baterai"
-          class="component-image"
-        />
-        Aki/Baterai
+    <div class="container">
+      <div class="components-sidebar">
+        <h2>Komponen</h2>
+        <div
+          class="component battery"
+          draggable="true"
+          data-component="battery"
+        >
+          <div class="battery-icon">
+            <img src="image/batre.png" alt="Battery" width="60" height="30" />
+          </div>
+          <span>AKI</span>
+        </div>
+        
+        <!-- Add new fuse component -->
+        <div
+          class="component fuse"
+          draggable="true"
+          data-component="fuse"
+        >
+          <div class="fuse-icon">
+            <img
+              src="image/fuse.jpg"
+              alt="Fuse"
+              width="40"
+              height="20"
+            />
+          </div>
+          <span>Sekring</span>
+        </div>
+        
+        <div class="component light" draggable="true" data-component="light">
+          <div class="light-icon">
+            <div class="light-bulb"></div>
+          </div>
+          <span>Lampu Sein</span>
+        </div>
+        
+        <!-- Replace separate turn switches with combined SW Sein component -->
+        <div
+          class="component sw-sein"
+          draggable="true"
+          data-component="sw-sein"
+        >
+          <div class="sw-sein-icon">
+            <img
+              src="image/switch.png"
+              alt="SW Sein"
+              width="30"
+              height="30"
+            />
+          </div>
+          <span>SW Sein</span>
+        </div>
+        
+        <div
+          class="component flasher"
+          draggable="true"
+          data-component="flasher"
+        >
+          <div class="flasher-icon">
+            <img
+              src="image/flasher.jpg"
+              alt="Flasher"
+              width="30"
+              height="30"
+            />
+          </div>
+          <span>Flasher</span>
+        </div>
+        <div class="component socket" draggable="true" data-component="socket">
+          <div class="socket-icon">
+            <img
+              src="image/kuncikontak.png"
+              alt="Socket Kunci Kontak"
+              width="50"
+              height="50"
+            />
+          </div>
+          <span>Kunci Kontak</span>
+        </div>
+        
       </div>
-      <div class="component" draggable="true" data-type="switch">
-        <img
-          src="https://lzd-img-global.slatic.net/g/p/4892fb0f0bfe1b4cea5450ffbecd80e5.jpg_720x720q80.jpg"
-          alt="Saklar On/Off"
-          class="component-image"
-        />
-        Saklar On/Off
-      </div>
-      <div class="component" draggable="true" data-type="flasher">
-        <img
-          src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSU1BCYTgBgSoTm4VTqztPOSO8xOt7HWF3wLA&s"
-          alt="Sign Flasher"
-          class="component-image"
-        />
-        Sign Flasher
-      </div>
-      <div class="component" draggable="true" data-type="directionSwitch">
-        <img
-          src="https://down-id.img.susercontent.com/file/e947a59de2228b53f55a40733752ca8a"
-          alt="Switch Arah"
-          class="component-image"
-        />
-        Switch Arah
-      </div>
-      <div class="component" draggable="true" data-type="lamp">
-        <img
-          src="data:image/jpeg;base64,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"
-          alt="Lampu"
-          class="component-image"
-        />
-        Lampu
-      </div>
-    </div>
-
-    <div class="color-picker-dialog" style="display: none;">
-      <div class="color-picker-content">
-        <h3>Pilih Warna Kabel</h3>
-        <div class="color-options">
-          <div class="color-option" data-color="#ff0000" style="background-color: #ff0000;"></div>
-          <div class="color-option" data-color="#000000" style="background-color: #000000;"></div>
-          <div class="color-option" data-color="#0000ff" style="background-color: #0000ff;"></div>
-          <div class="color-option" data-color="#00ff00" style="background-color: #00ff00;"></div>
-          <div class="color-option" data-color="#ffff00" style="background-color: #ffff00;"></div>
+      <div class="workspace">
+        <h2>Simulasi Sistem Lampu Sein</h2>
+        <div class="workspace-area" id="workspace-area">
+          <div class="workspace-hint">
+            Silahkan klik komponen untuk menambahkan ke workspace
+          </div>
+        </div>
+        <div class="navigation-container">
+          <a href="rem.html" class="nav-button next-button"
+            >Simulasi Selanjutnya (Lampu Rem)</a
+          >
         </div>
       </div>
     </div>
-
-    <canvas id="workArea" width="800" height="600"></canvas>
-
-    <div class="navigation-buttons">
-      <a href="rem.html" class="nav-button next-button"
-        >Simulasi Selanjutnya (Lampu Kepala) →</a
-      >
-    </div>
-
     <script src="sein.js"></script>
   </body>
 </html>
