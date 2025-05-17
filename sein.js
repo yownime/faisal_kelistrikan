@@ -1,1251 +1,868 @@
-class Component {
-  constructor(type, x, y) {
-    this.type = type;
-    this.x = x;
-    this.y = y;
-    this.rotation = 0;
-    this.isSelected = false;
-    this.connectedWires = [];
-    this.connectionPoints = [];
-    this.isPowered = false; // Status komponen dialiri listrik
-    this.isOn = type === "battery"; // Battery selalu ON sebagai sumber listrik
-    this.createConnectionPoints();
+document.addEventListener('DOMContentLoaded', () => {
+    // Global variables
+    const components = document.querySelectorAll('.component');
+    const workspaceArea = document.getElementById('workspace-area');
+    let selectedPoint = null;
+    let connections = [];
+    let turnStates = {
+        left: false,
+        right: false
+    };
+    let blinkInterval = null;
+    let blinkState = false;
 
-    // Tambah properti khusus untuk switch
-    if (type === "switch") {
-      this.switchState = false; // Status ON/OFF
-      this.buttonOffset = 0;
-    }
-    this.originalRotation = 0; // Tambah tracking rotasi asli
-    this.totalRotation = 0; // Tambah tracking total rotasi
-
-    // Tambah properti khusus untuk directionSwitch
-    if (type === "directionSwitch") {
-      this.selectedDirection = "none";
-      // Pisahkan posisi tombol dari connection points
-      this.buttons = [
-        { label: "L", x: -25, y: -12, direction: "left" },
-        { label: "C", x: 0, y: -12, direction: "center" },
-        { label: "R", x: 25, y: -12, direction: "right" },
-      ];
-      this.isOn = false;
-    }
-
-    if (type === "flasher") {
-      this.isFlashing = false;
-      this.flashInterval = null;
-      this.flashState = false;
-      this.flashSpeed = 500; // 500ms interval kedip
-    }
-
-    // Tambah visual feedback saat hover
-    this.isHovered = false;
-  }
-
-  createConnectionPoints() {
-    if (this.type === "directionSwitch") {
-      // Pisahkan posisi connection points dari tombol
-      this.connectionPoints = [
-        { originalX: -35, originalY: 10, index: 0 }, // Input (belakang)
-        { originalX: -25, originalY: 10, index: 1 }, // Left output
-        { originalX: 0, originalY: 10, index: 2 }, // Center output
-        { originalX: 25, originalY: 10, index: 3 }, // Right output
-      ].map((point) => ({
-        ...point,
-        x: this.x + point.originalX,
-        y: this.y + point.originalY,
-        isPowered: false,
-      }));
-    } else {
-      let points = [];
-
-      switch (this.type) {
-        case "battery":
-          points = [
-            { originalX: -25, originalY: 0, index: 0 },
-            { originalX: 25, originalY: 0, index: 1 },
-          ];
-          break;
-        case "switch":
-          points = [
-            { originalX: -25, originalY: 0, index: 0 },
-            { originalX: 25, originalY: 0, index: 1 },
-          ];
-          break;
-        case "directionSwitch":
-          // 1 input di belakang, 3 output sesuai tombol
-          points = [
-            { originalX: -35, originalY: 0, index: 0 }, // Input (belakang)
-            { originalX: -25, originalY: 0, index: 1 }, // Left output
-            { originalX: 0, originalY: 0, index: 2 }, // Center output
-            { originalX: 25, originalY: 0, index: 3 }, // Right output
-          ];
-          break;
-        default:
-          points = [
-            { originalX: -25, originalY: 0, index: 0 },
-            { originalX: 25, originalY: 0, index: 1 },
-            { originalX: 0, originalY: -25, index: 2 },
-            { originalX: 0, originalY: 25, index: 3 },
-          ];
-      }
-
-      this.connectionPoints = points.map((point) => ({
-        ...point,
-        x: this.x + point.originalX,
-        y: this.y + point.originalY,
-        isPowered: false,
-      }));
-    }
-  }
-
-  draw(ctx) {
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.rotate(this.rotation);
-    ctx.translate(-this.x, -this.y);
-
-    // Efek bayangan untuk semua komponen
-    if (this.isSelected) {
-      ctx.shadowColor = "rgba(0, 102, 255, 0.5)";
-      ctx.shadowBlur = 10;
-    }
-
-    // Tambah visual feedback saat hover
-    if (this.isHovered) {
-      ctx.beginPath();
-      ctx.strokeStyle = "rgba(255, 0, 0, 0.5)";
-      ctx.lineWidth = 2;
-      ctx.setLineDash([5, 5]);
-      ctx.arc(this.x, this.y, 25, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-
-    switch (this.type) {
-      case "battery":
-        this.drawBattery(ctx);
-        break;
-      case "switch":
-        this.drawSwitch(ctx);
-        break;
-      case "flasher":
-        this.drawFlasher(ctx);
-        break;
-      case "directionSwitch":
-        this.drawDirectionSwitch(ctx);
-        break;
-      case "lamp":
-        this.drawLamp(ctx);
-        break;
-    }
-
-    ctx.restore();
-
-    // Gambar connection points
-    this.drawConnectionPoints(ctx);
-  }
-
-  drawBattery(ctx) {
-    // Body baterai
-    const gradient = ctx.createLinearGradient(
-      this.x - 25,
-      this.y,
-      this.x + 25,
-      this.y
-    );
-    gradient.addColorStop(0, "#4a4a4a");
-    gradient.addColorStop(1, "#2d2d2d");
-
-    ctx.fillStyle = gradient;
-    ctx.strokeStyle = this.isSelected ? "#0066ff" : "#000";
-    ctx.lineWidth = this.isSelected ? 3 : 2;
-
-    // Body utama
-    ctx.beginPath();
-    ctx.roundRect(this.x - 25, this.y - 20, 50, 40, 5);
-    ctx.fill();
-    ctx.stroke();
-
-    // Terminal positif/negatif
-    ctx.fillStyle = "#ddd";
-    ctx.font = "bold 16px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText("+", this.x + 15, this.y + 5);
-    ctx.fillText("-", this.x - 15, this.y + 5);
-
-    // Efek metalik
-    const metalGradient = ctx.createLinearGradient(
-      this.x,
-      this.y - 20,
-      this.x,
-      this.y + 20
-    );
-    metalGradient.addColorStop(0, "rgba(255,255,255,0.1)");
-    metalGradient.addColorStop(0.5, "rgba(255,255,255,0)");
-    metalGradient.addColorStop(1, "rgba(255,255,255,0.1)");
-    ctx.fillStyle = metalGradient;
-    ctx.fill();
-  }
-
-  drawSwitch(ctx) {
-    // Body switch
-    const bodyGradient = ctx.createLinearGradient(
-      this.x - 25,
-      this.y - 15,
-      this.x + 25,
-      this.y + 15
-    );
-    bodyGradient.addColorStop(0, "#e0e0e0");
-    bodyGradient.addColorStop(1, "#b0b0b0");
-
-    ctx.fillStyle = bodyGradient;
-    ctx.strokeStyle = this.isSelected ? "#0066ff" : "#333";
-    ctx.lineWidth = this.isSelected ? 3 : 2;
-
-    // Body dengan sudut rounded
-    ctx.beginPath();
-    ctx.roundRect(this.x - 25, this.y - 15, 50, 30, 5);
-    ctx.fill();
-    ctx.stroke();
-
-    // Tombol switch
-    const buttonX = this.switchState ? this.x + 10 : this.x - 10;
-    const buttonGradient = ctx.createRadialGradient(
-      buttonX,
-      this.y - 2,
-      0,
-      buttonX,
-      this.y - 2,
-      12
-    );
-    buttonGradient.addColorStop(
-      0,
-      this.isPowered && this.switchState ? "#ffeb3b" : "#fff"
-    );
-    buttonGradient.addColorStop(
-      1,
-      this.isPowered && this.switchState ? "#ffd700" : "#ddd"
-    );
-
-    ctx.fillStyle = buttonGradient;
-    ctx.beginPath();
-    ctx.arc(buttonX, this.y, 12, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // Label ON/OFF dengan efek emboss
-    ctx.fillStyle = "#666";
-    ctx.font = "bold 10px Arial";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(this.switchState ? "ON" : "OFF", this.x, this.y + 20);
-  }
-
-  drawFlasher(ctx) {
-    // Body flasher dengan gradien
-    const bodyGradient = ctx.createLinearGradient(
-      this.x - 25,
-      this.y - 15,
-      this.x + 25,
-      this.y + 15
-    );
-    bodyGradient.addColorStop(0, "#3d3d3d");
-    bodyGradient.addColorStop(1, "#1a1a1a");
-
-    ctx.fillStyle = bodyGradient;
-    ctx.strokeStyle = this.isSelected ? "#0066ff" : "#000";
-    ctx.lineWidth = this.isSelected ? 3 : 2;
-
-    // Body dengan sudut rounded
-    ctx.beginPath();
-    ctx.roundRect(this.x - 25, this.y - 15, 50, 30, 5);
-    ctx.fill();
-    ctx.stroke();
-
-    // Simbol petir
-    ctx.beginPath();
-    ctx.moveTo(this.x - 10, this.y - 8);
-    ctx.lineTo(this.x + 2, this.y - 8);
-    ctx.lineTo(this.x - 3, this.y);
-    ctx.lineTo(this.x + 10, this.y);
-    ctx.lineTo(this.x - 2, this.y + 8);
-    ctx.lineTo(this.x - 7, this.y + 8);
-    ctx.lineTo(this.x - 10, this.y);
-    ctx.closePath();
-
-    // Gradien untuk simbol petir
-    const boltGradient = ctx.createLinearGradient(
-      this.x - 10,
-      this.y,
-      this.x + 10,
-      this.y
-    );
-    boltGradient.addColorStop(0, this.flashState ? "#ffeb3b" : "#666");
-    boltGradient.addColorStop(1, this.flashState ? "#ffd700" : "#999");
-
-    ctx.fillStyle = boltGradient;
-    ctx.fill();
-    ctx.strokeStyle = "#000";
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-    // Indikator status
-    ctx.fillStyle = this.flashState ? "#ffeb3b" : "#666";
-    ctx.beginPath();
-    ctx.arc(this.x + 15, this.y - 8, 3, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  drawDirectionSwitch(ctx) {
-    // Body switch arah
-    const bodyGradient = ctx.createLinearGradient(
-      this.x - 35,
-      this.y - 25,
-      this.x + 35,
-      this.y + 25
-    );
-    bodyGradient.addColorStop(0, "#4a4a4a");
-    bodyGradient.addColorStop(1, "#2d2d2d");
-
-    ctx.fillStyle = bodyGradient;
-    ctx.strokeStyle = this.isSelected ? "#0066ff" : "#000";
-    ctx.lineWidth = this.isSelected ? 3 : 2;
-
-    // Body dengan sudut rounded
-    ctx.beginPath();
-    ctx.roundRect(this.x - 35, this.y - 25, 70, 50, 8);
-    ctx.fill();
-    ctx.stroke();
-
-    // Gambar tombol-tombol
-    this.buttons.forEach((button) => {
-      const buttonX = this.x + button.x;
-      const buttonY = this.y + button.y;
-
-      // Gradien untuk tombol
-      const buttonGradient = ctx.createRadialGradient(
-        buttonX,
-        buttonY - 2,
-        0,
-        buttonX,
-        buttonY - 2,
-        8
-      );
-
-      if (this.selectedDirection === button.direction && this.isOn) {
-        buttonGradient.addColorStop(0, "#ffeb3b");
-        buttonGradient.addColorStop(1, "#ffd700");
-      } else {
-        buttonGradient.addColorStop(0, "#fff");
-        buttonGradient.addColorStop(1, "#ddd");
-      }
-
-      ctx.fillStyle = buttonGradient;
-      ctx.beginPath();
-      ctx.arc(buttonX, buttonY, 8, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      // Label tombol dengan efek emboss
-      ctx.fillStyle = "#000";
-      ctx.font = "bold 10px Arial";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(button.label, buttonX, buttonY);
+    // Initialize event listeners
+    components.forEach(component => {
+        component.addEventListener('click', handleComponentClick);
     });
 
-    // Status ON/OFF
-    ctx.fillStyle = "#fff";
-    ctx.font = "10px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText(this.isOn ? "ON" : "OFF", this.x, this.y + 20);
-  }
+    // Component creation and management
+    function handleComponentClick(e) {
+        const clone = this.cloneNode(true);
+        clone.style.position = 'absolute';
+        
+        // Center component in workspace
+        const workspaceRect = workspaceArea.getBoundingClientRect();
+        const centerX = workspaceRect.width / 2;
+        const centerY = workspaceRect.height / 2;
+        
+        clone.style.left = `${centerX - clone.offsetWidth / 2}px`;
+        clone.style.top = `${centerY - clone.offsetHeight / 2}px`;
 
-  drawLamp(ctx) {
-    // Base bulb gradient
-    const bulbGradient = ctx.createRadialGradient(
-      this.x,
-      this.y,
-      0,
-      this.x,
-      this.y,
-      20
-    );
-
-    if (this.isPowered && (!this.isFlashing || this.flashState)) {
-      bulbGradient.addColorStop(0, "rgba(255, 255, 200, 0.9)");
-      bulbGradient.addColorStop(0.7, "rgba(255, 235, 59, 0.8)");
-      bulbGradient.addColorStop(1, "rgba(255, 235, 59, 0.2)");
-    } else {
-      bulbGradient.addColorStop(0, "#fff");
-      bulbGradient.addColorStop(1, "#e0e0e0");
+        // Add connection points based on component type
+        setupComponentConnections(clone, this.dataset.component);
+        
+        // Add event listeners for component manipulation
+        clone.addEventListener('mousedown', handleMouseDown);
+        clone.addEventListener('contextmenu', handleContextMenu);
+        workspaceArea.appendChild(clone);
     }
 
-    // Gambar bola lampu
-    ctx.beginPath();
-    ctx.fillStyle = bulbGradient;
-    ctx.strokeStyle = this.isSelected ? "#0066ff" : "#000";
-    ctx.lineWidth = this.isSelected ? 3 : 2;
-    ctx.arc(this.x, this.y, 20, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // Base lampu
-    ctx.beginPath();
-    ctx.fillStyle = "#666";
-    ctx.rect(this.x - 8, this.y + 20, 16, 5);
-    ctx.fill();
-
-    // Efek cahaya ketika menyala
-    if (this.isPowered && (!this.isFlashing || this.flashState)) {
-      const glowGradient = ctx.createRadialGradient(
-        this.x,
-        this.y,
-        15,
-        this.x,
-        this.y,
-        40
-      );
-      glowGradient.addColorStop(0, "rgba(255, 235, 59, 0.3)");
-      glowGradient.addColorStop(1, "rgba(255, 235, 59, 0)");
-
-      ctx.fillStyle = glowGradient;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, 40, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Efek filamen
-      ctx.beginPath();
-      ctx.strokeStyle = "rgba(255, 200, 0, 0.8)";
-      ctx.lineWidth = 1.5;
-      ctx.moveTo(this.x - 10, this.y);
-      ctx.quadraticCurveTo(this.x, this.y - 10, this.x + 10, this.y);
-      ctx.stroke();
+    function setupComponentConnections(clone, componentType) {
+        switch(componentType) {
+            case 'battery':
+                setupBattery(clone);
+                break;
+            case 'fuse':
+                setupFuse(clone);
+                break;
+            case 'light':
+                setupLight(clone);
+                break;
+            case 'sw-sein': // New combined turn switch component
+                setupSwSein(clone);
+                break;
+            case 'flasher':
+                setupFlasher(clone);
+                break;
+            case 'socket':
+                setupSocket(clone);
+                break;
+        }
     }
-  }
 
-  drawConnectionPoints(ctx) {
-    this.connectionPoints.forEach((point, index) => {
-      // Gradient untuk connection point
-      const pointGradient = ctx.createRadialGradient(
-        point.x,
-        point.y,
-        0,
-        point.x,
-        point.y,
-        5
-      );
-
-      if (point.isPowered) {
-        pointGradient.addColorStop(0, "rgba(255, 235, 59, 1)");
-        pointGradient.addColorStop(1, "rgba(255, 235, 59, 0.5)");
-      } else {
-        pointGradient.addColorStop(0, "rgba(0, 120, 255, 0.8)");
-        pointGradient.addColorStop(1, "rgba(0, 120, 255, 0.3)");
-      }
-
-      ctx.beginPath();
-      ctx.fillStyle = pointGradient;
-      ctx.strokeStyle = "#000";
-      ctx.lineWidth = 1;
-      ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-    });
-  }
-
-  updateRotation(newAngle) {
-    // Hitung perubahan rotasi
-    let deltaRotation = newAngle - this.rotation;
-
-    // Normalisasi delta ke range -PI sampai PI
-    if (deltaRotation > Math.PI) deltaRotation -= Math.PI * 2;
-    if (deltaRotation < -Math.PI) deltaRotation += Math.PI * 2;
-
-    // Update total rotasi
-    this.totalRotation += deltaRotation;
-    this.rotation = newAngle;
-
-    // Normalisasi rotasi ke range 0-2PI
-    while (this.rotation < 0) this.rotation += Math.PI * 2;
-    while (this.rotation >= Math.PI * 2) this.rotation -= Math.PI * 2;
-
-    // Update connection points
-    this.updateConnectionPoints();
-
-    // Update connected wires
-    this.connectedWires.forEach((wire) => {
-      if (wire.start.component === this) {
-        const point = this.connectionPoints[wire.start.originalIndex];
-        wire.start.x = point.x;
-        wire.start.y = point.y;
-      }
-      if (wire.end.component === this) {
-        const point = this.connectionPoints[wire.end.originalIndex];
-        wire.end.x = point.x;
-        wire.end.y = point.y;
-      }
-    });
-  }
-
-  updatePosition(dx, dy) {
-    this.x += dx;
-    this.y += dy;
-    this.updateConnectionPoints();
-
-    // Update semua kabel yang terhubung
-    this.connectedWires.forEach((wire) => {
-      // Update posisi kabel untuk komponen ini
-      if (wire.start.component === this) {
-        const point = this.connectionPoints[wire.start.originalIndex];
-        wire.start.x = point.x;
-        wire.start.y = point.y;
-      }
-      if (wire.end.component === this) {
-        const point = this.connectionPoints[wire.end.originalIndex];
-        wire.end.x = point.x;
-        wire.end.y = point.y;
-      }
-
-      // Update posisi kabel untuk komponen yang terhubung
-      const otherComponent =
-        wire.start.component === this
-          ? wire.end.component
-          : wire.start.component;
-
-      if (otherComponent) {
-        const otherPoint =
-          otherComponent.connectionPoints[
-            wire.start.component === this
-              ? wire.end.originalIndex
-              : wire.start.originalIndex
-          ];
-
-        if (wire.start.component === otherComponent) {
-          wire.start.x = otherPoint.x;
-          wire.start.y = otherPoint.y;
+    // New function to setup the combined SW Sein component
+        function setupSwSein(clone) {
+        // Add input terminal
+        const inputPoint = document.createElement('div');
+        inputPoint.className = 'connection-point input';
+        inputPoint.dataset.type = 'input';
+        inputPoint.style.left = '-4px';
+        inputPoint.style.top = '50%';
+        inputPoint.style.transform = 'translateY(-50%)';
+        clone.appendChild(inputPoint);
+        inputPoint.addEventListener('click', handleConnectionPointClick);
+    
+        // Add left output terminal
+        const leftOutputPoint = document.createElement('div');
+        leftOutputPoint.className = 'connection-point output left-output';
+        leftOutputPoint.dataset.type = 'output';
+        leftOutputPoint.dataset.direction = 'left';
+        leftOutputPoint.style.right = '-4px';
+        leftOutputPoint.style.top = '30%';
+        clone.appendChild(leftOutputPoint);
+        leftOutputPoint.addEventListener('click', handleConnectionPointClick);
+    
+        // Add right output terminal
+        const rightOutputPoint = document.createElement('div');
+        rightOutputPoint.className = 'connection-point output right-output';
+        rightOutputPoint.dataset.type = 'output';
+        rightOutputPoint.dataset.direction = 'right';
+        rightOutputPoint.style.right = '-4px';
+        rightOutputPoint.style.top = '70%';
+        clone.appendChild(rightOutputPoint);
+        rightOutputPoint.addEventListener('click', handleConnectionPointClick);
+    
+        // Create switch container div
+        const switchContainer = document.createElement('div');
+        switchContainer.className = 'switch-container';
+        switchContainer.style.display = 'flex';
+        switchContainer.style.flexDirection = 'row';
+        switchContainer.style.justifyContent = 'flex-start'; // Changed to flex-start to align buttons to the left
+        switchContainer.style.marginTop = '10px';
+        switchContainer.style.width = '70%'; // Reduced width
+        switchContainer.style.gap = '8px'; // Keep small gap between buttons
+        switchContainer.style.margin = '10px 0 10px 10px'; // Left margin only
+    
+        // Create left button
+        const leftButton = document.createElement('button');
+        leftButton.className = 'turn-switch-button left-button';
+        leftButton.textContent = 'KIRI: OFF';
+        leftButton.dataset.state = 'off';
+        leftButton.dataset.direction = 'left';
+        leftButton.style.padding = '4px 8px';
+        leftButton.style.fontSize = '10px';
+        leftButton.style.whiteSpace = 'nowrap';
+        leftButton.style.position = 'relative';
+        leftButton.style.minWidth = '55px';
+        leftButton.addEventListener('click', handleTurnSwitchClick);
+    
+        // Create right button
+        const rightButton = document.createElement('button');
+        rightButton.className = 'turn-switch-button right-button';
+        rightButton.textContent = 'KANAN: OFF';
+        rightButton.dataset.state = 'off';
+        rightButton.dataset.direction = 'right';
+        rightButton.style.padding = '4px 8px';
+        rightButton.style.fontSize = '10px';
+        rightButton.style.whiteSpace = 'nowrap';
+        rightButton.style.position = 'relative';
+        rightButton.style.minWidth = '55px';
+        rightButton.addEventListener('click', handleTurnSwitchClick);
+    
+        // Add buttons to container
+        switchContainer.appendChild(leftButton);
+        switchContainer.appendChild(rightButton);
+    
+        // Add container to component
+        clone.appendChild(switchContainer);
+    
+        // Make component wider to fit both buttons with spacing
+        clone.style.minWidth = '180px';
+        clone.style.padding = '10px';
+        
+        // Add extra space on the right side to avoid overlap with connection points
+        clone.style.paddingRight = '25px';
+    }
+    
+    // Handler for turn switch button clicks
+    function handleTurnSwitchClick(e) {
+        e.stopPropagation();
+        const button = e.target;
+        const direction = button.dataset.direction;
+        
+        // Toggle switch state
+        if (button.dataset.state === 'off') {
+            // Turn off the other button if it's on
+            const switchContainer = button.closest('.switch-container');
+            const otherButton = switchContainer.querySelector(`.turn-switch-button:not([data-direction="${direction}"])`);
+            
+            if (otherButton && otherButton.dataset.state === 'on') {
+                otherButton.dataset.state = 'off';
+                otherButton.textContent = `${otherButton.dataset.direction === 'left' ? 'KIRI' : 'KANAN'}: OFF`;
+                turnStates[otherButton.dataset.direction] = false;
+            }
+            
+            // Turn on this button
+            button.dataset.state = 'on';
+            button.textContent = `${direction === 'left' ? 'KIRI' : 'KANAN'}: ON`;
+            turnStates[direction] = true;
         } else {
-          wire.end.x = otherPoint.x;
-          wire.end.y = otherPoint.y;
+            // Turn off this button
+            button.dataset.state = 'off';
+            button.textContent = `${direction === 'left' ? 'KIRI' : 'KANAN'}: OFF`;
+            turnStates[direction] = false;
         }
-      }
-    });
-  }
-
-  updateConnectedWires() {
-    this.connectedWires.forEach((wire) => {
-      if (wire.start.component === this) {
-        const point = this.connectionPoints[wire.start.originalIndex];
-        if (point) {
-          wire.start.x = point.x;
-          wire.start.y = point.y;
-        }
-      }
-      if (wire.end.component === this) {
-        const point = this.connectionPoints[wire.end.originalIndex];
-        if (point) {
-          wire.end.x = point.x;
-          wire.end.y = point.y;
-        }
-      }
-    });
-  }
-
-  updateConnectionPoints() {
-    const cos = Math.cos(this.rotation);
-    const sin = Math.sin(this.rotation);
-
-    this.connectionPoints.forEach((point) => {
-      // Rotasi relatif terhadap pusat komponen
-      point.x = this.x + (point.originalX * cos - point.originalY * sin);
-      point.y = this.y + (point.originalX * sin + point.originalY * cos);
-    });
-  }
-
-  isPointInside(x, y) {
-    if (this.type === "directionSwitch") {
-      // Transform coordinates
-      const dx = x - this.x;
-      const dy = y - this.y;
-      const cos = Math.cos(-this.rotation);
-      const sin = Math.sin(-this.rotation);
-      const rotatedX = dx * cos - dy * sin;
-      const rotatedY = dx * sin + dy * cos;
-
-      // Cek apakah point ada di dalam area tombol
-      for (const button of this.buttons) {
-        const buttonX = button.x;
-        const buttonY = button.y;
-        const distance = Math.hypot(rotatedX - buttonX, rotatedY - buttonY);
-        if (distance <= 8) {
-          if (this.selectedDirection === button.direction) {
-            this.isOn = !this.isOn;
-          } else {
-            this.selectedDirection = button.direction;
-            this.isOn = true;
-          }
-          return true;
-        }
-      }
-
-      // Cek area switch body
-      return Math.abs(rotatedX) <= 35 && Math.abs(rotatedY) <= 25;
-    } else if (this.type === "switch") {
-      // Transformasi koordinat klik ke koordinat lokal komponen
-      const dx = x - this.x;
-      const dy = y - this.y;
-      const cos = Math.cos(-this.rotation);
-      const sin = Math.sin(-this.rotation);
-      const rotatedX = dx * cos - dy * sin;
-      const rotatedY = dx * sin + dy * cos;
-
-      // Cek apakah point berada dalam area switch
-      return Math.abs(rotatedX) <= 25 && Math.abs(rotatedY) <= 15;
-    } else {
-      return Math.hypot(x - this.x, y - this.y) <= 20;
-    }
-  }
-
-  isRotationHandleClicked(x, y) {
-    if (!this.isSelected) return false;
-
-    // Transformasi koordinat handle rotasi
-    const handleX = this.x;
-    const handleY = this.y - 40;
-    const cos = Math.cos(this.rotation);
-    const sin = Math.sin(this.rotation);
-    const rotatedHandleX = this.x + (0 * cos - -40 * sin);
-    const rotatedHandleY = this.y + (0 * sin + -40 * cos);
-
-    return Math.hypot(x - rotatedHandleX, y - rotatedHandleY) <= 6;
-  }
-
-  isNearConnectionPoint(index, point) {
-    const originalPoint = this.connectionPoints[index];
-    return (
-      Math.abs(originalPoint.originalX - point.originalX) < 0.1 &&
-      Math.abs(originalPoint.originalY - point.originalY) < 0.1
-    );
-  }
-
-  toggleSwitch() {
-    if (this.type === "switch") {
-      this.switchState = !this.switchState;
-      this.isOn = this.switchState;
-    }
-  }
-
-  propagateCurrentToDirection(direction) {
-    if (!this.isOn || !this.isPowered) return false;
-
-    // Tentukan index connection point berdasarkan arah
-    let outputIndex;
-    switch (direction) {
-      case "left":
-        outputIndex = 1;
-        break;
-      case "center":
-        outputIndex = 2;
-        break;
-      case "right":
-        outputIndex = 3;
-        break;
-      default:
-        return false;
+        
+        updatePowerState();
     }
 
-    // Aktifkan titik koneksi yang sesuai
-    this.connectionPoints.forEach((point, index) => {
-      point.isPowered = index === 0 || index === outputIndex;
-    });
+    function setupBattery(clone) {
+        // Add positive terminal
+        addConnectionPoint(clone, 'connection-point output positive', 'output', 'positive');
+        
+        // Add negative terminal
+        addConnectionPoint(clone, 'connection-point output negative', 'output', 'negative');
+        
+        // Add voltage control
+        const voltageControl = document.createElement('div');
+        voltageControl.className = 'voltage-control';
+        voltageControl.innerHTML = `
+            <input type="number" min="0" max="24" step="0.1" value="12.0" class="voltage-input">
+            <span>V</span>
+        `;
+        clone.appendChild(voltageControl);
 
-    return true;
-  }
-
-  startFlashing() {
-    if (!this.flashInterval) {
-      this.isFlashing = true;
-      this.flashInterval = setInterval(() => {
-        this.flashState = !this.flashState;
-        // Trigger update untuk semua lampu yang terhubung
-        if (this.circuit) {
-          this.circuit.updateFlashingLamps();
-        }
-      }, this.flashSpeed);
-    }
-  }
-
-  stopFlashing() {
-    if (this.flashInterval) {
-      clearInterval(this.flashInterval);
-      this.flashInterval = null;
-      this.isFlashing = false;
-      this.flashState = false;
-    }
-  }
-}
-
-class Circuit {
-  constructor(canvas) {
-    this.canvas = canvas;
-    this.ctx = canvas.getContext("2d");
-    this.components = [];
-    this.wires = [];
-    this.selectedComponent = null;
-    this.isDragging = false;
-    this.isRotating = false;
-    this.connecting = null;
-    this.lastMouseX = 0;
-    this.lastMouseY = 0;
-    this.rotationStartAngle = 0;
-    this.lastUpdateTime = 0;
-    this.wireUpdateQueue = new Set(); // Tambah queue untuk update wire
-    this.rotationSensitivity = 0.5; // Sesuaikan sensitivitas rotasi
-    this.lastRotationAngle = 0;
-    this.flashers = new Set();
-
-    this.setupEventListeners();
-    this.updateInterval = setInterval(() => this.updateCircuit(), 100); // Update circuit setiap 100ms
-
-    // Tambah method untuk delete component
-    this.setupDeleteFeature();
-  }
-
-  setupEventListeners() {
-    // Drag and drop komponen baru
-    this.canvas.addEventListener("dragover", (e) => e.preventDefault());
-
-    this.canvas.addEventListener("drop", (e) => {
-      e.preventDefault();
-      const type = e.dataTransfer.getData("text/plain");
-      const rect = this.canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-
-      // Unselect semua komponen yang ada
-      this.components.forEach((c) => (c.isSelected = false));
-
-      // Buat komponen baru dalam keadaan terseleksi
-      const newComponent = new Component(type, x, y);
-      newComponent.isSelected = true;
-      this.components.push(newComponent);
-      this.selectedComponent = newComponent;
-
-      this.draw();
-    });
-
-    // Mouse events
-    this.canvas.addEventListener("mousedown", (e) => {
-      const rect = this.canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-
-      // Reset rotation tracking pada mousedown
-      this.lastRotationAngle = undefined;
-
-      let clickedOnConnection = false;
-      this.components.forEach((component) => {
-        component.connectionPoints.forEach((point, index) => {
-          if (Math.hypot(x - point.x, y - point.y) < 5) {
-            this.connecting = {
-              start: point,
-              component: component,
-              pointIndex: index,
-            };
-            clickedOnConnection = true;
-          }
+        const input = voltageControl.querySelector('.voltage-input');
+        input.addEventListener('input', (e) => {
+            let value = parseFloat(e.target.value);
+            if (isNaN(value)) value = 0;
+            if (value < 0) value = 0;
+            if (value > 24) value = 24;
+            updatePowerState();
         });
-      });
+    }
 
-      if (!clickedOnConnection) {
-        // Cek rotation handle
-        let clickedRotationHandle = false;
-        this.components.forEach((component) => {
-          if (component.isRotationHandleClicked(x, y)) {
-            clickedRotationHandle = true;
-            this.isRotating = true;
-            this.selectedComponent = component;
-            this.rotationStartAngle = Math.atan2(
-              y - component.y,
-              x - component.x
-            );
-          }
+    function setupFuse(clone) {
+        // Add input terminal
+        const inputPoint = document.createElement('div');
+        inputPoint.className = 'connection-point input';
+        inputPoint.dataset.type = 'input';
+        inputPoint.style.left = '-4px';
+        inputPoint.style.top = '50%';
+        inputPoint.style.transform = 'translateY(-50%)';
+        clone.appendChild(inputPoint);
+        inputPoint.addEventListener('click', handleConnectionPointClick);
+
+        // Add output terminal
+        const outputPoint = document.createElement('div');
+        outputPoint.className = 'connection-point output';
+        outputPoint.dataset.type = 'output';
+        outputPoint.style.right = '-4px';
+        outputPoint.style.top = '50%';
+        outputPoint.style.transform = 'translateY(-50%)';
+        clone.appendChild(outputPoint);
+        outputPoint.addEventListener('click', handleConnectionPointClick);
+    }
+
+    function setupLight(clone) {
+        // Add input terminal
+        const inputPoint = document.createElement('div');
+        inputPoint.className = 'connection-point input';
+        inputPoint.dataset.type = 'input';
+        inputPoint.style.left = '-4px';
+        inputPoint.style.top = '50%';
+        inputPoint.style.transform = 'translateY(-50%)';
+        clone.appendChild(inputPoint);
+        inputPoint.addEventListener('click', handleConnectionPointClick);
+
+        // Add output terminal
+        const outputPoint = document.createElement('div');
+        outputPoint.className = 'connection-point output';
+        outputPoint.dataset.type = 'output';
+        outputPoint.style.right = '-4px';
+        outputPoint.style.top = '50%';
+        outputPoint.style.transform = 'translateY(-50%)';
+        clone.appendChild(outputPoint);
+        outputPoint.addEventListener('click', handleConnectionPointClick);
+    }
+
+    function setupFlasher(clone) {
+        // Add input terminal
+        const inputPoint = document.createElement('div');
+        inputPoint.className = 'connection-point input';
+        inputPoint.dataset.type = 'input';
+        inputPoint.style.left = '-4px';
+        inputPoint.style.top = '50%';
+        inputPoint.style.transform = 'translateY(-50%)';
+        clone.appendChild(inputPoint);
+        inputPoint.addEventListener('click', handleConnectionPointClick);
+
+        // Add output terminal
+        const outputPoint = document.createElement('div');
+        outputPoint.className = 'connection-point output';
+        outputPoint.dataset.type = 'output';
+        outputPoint.style.right = '-4px';
+        outputPoint.style.top = '50%';
+        outputPoint.style.transform = 'translateY(-50%)';
+        clone.appendChild(outputPoint);
+        outputPoint.addEventListener('click', handleConnectionPointClick);
+        
+        // Add label to indicate it's a flasher
+        const label = document.createElement('div');
+        label.className = 'flasher-label';
+        label.textContent = 'Flasher';
+        label.style.textAlign = 'center';
+        label.style.fontSize = '12px';
+        label.style.marginTop = '5px';
+        clone.appendChild(label);
+    }
+
+    function setupSocket(clone) {
+        // Add input terminal
+        const inputPoint = document.createElement('div');
+        inputPoint.className = 'connection-point input';
+        inputPoint.dataset.type = 'input';
+        inputPoint.style.left = '-4px';
+        inputPoint.style.top = '50%';
+        inputPoint.style.transform = 'translateY(-50%)';
+        clone.appendChild(inputPoint);
+        inputPoint.addEventListener('click', handleConnectionPointClick);
+
+        // Add output terminal
+        const outputPoint = document.createElement('div');
+        outputPoint.className = 'connection-point output';
+        outputPoint.dataset.type = 'output';
+        outputPoint.style.right = '-4px';
+        outputPoint.style.top = '50%';
+        outputPoint.style.transform = 'translateY(-50%)';
+        clone.appendChild(outputPoint);
+        outputPoint.addEventListener('click', handleConnectionPointClick);
+    }
+
+    function addConnectionPoint(parent, className, type, extraData = null) {
+        const point = document.createElement('div');
+        point.className = className;
+        point.dataset.type = type;
+        if (extraData) {
+            point.dataset[extraData] = extraData;
+        }
+        parent.appendChild(point);
+        point.addEventListener('click', handleConnectionPointClick);
+        return point;
+    }
+
+    // Component manipulation
+    function handleContextMenu(e) {
+        e.preventDefault();
+        const component = e.currentTarget;
+
+        // Remove associated connections
+        const points = component.querySelectorAll('.connection-point');
+        points.forEach(point => {
+            connections = connections.filter(conn => {
+                if (conn.startPoint === point || conn.endPoint === point) {
+                    conn.wire.remove();
+                    return false;
+                }
+                return true;
+            });
         });
 
-        if (!clickedRotationHandle) {
-          // Cek komponen
-          let clickedComponent = false;
-          for (let i = this.components.length - 1; i >= 0; i--) {
-            const component = this.components[i];
-            if (component.isPointInside(x, y)) {
-              clickedComponent = true;
-              this.components.forEach((c) => (c.isSelected = false));
-              component.isSelected = true;
-              this.selectedComponent = component;
-              this.isDragging = true;
-              this.lastMouseX = x;
-              this.lastMouseY = y;
-              break;
-            }
-          }
-
-          if (!clickedComponent) {
-            this.components.forEach((c) => (c.isSelected = false));
-            this.selectedComponent = null;
-          }
-        }
-      }
-
-      this.draw();
-    });
-
-    this.canvas.addEventListener("mousemove", (e) => {
-      const rect = this.canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-
-      if (this.isRotating && this.selectedComponent) {
-        // Hitung sudut relatif terhadap pusat komponen
-        const dx = x - this.selectedComponent.x;
-        const dy = y - this.selectedComponent.y;
-        const currentAngle = Math.atan2(dy, dx);
-
-        if (this.lastRotationAngle === undefined) {
-          this.lastRotationAngle = currentAngle;
-        }
-
-        // Hitung perubahan sudut
-        let deltaAngle = currentAngle - this.lastRotationAngle;
-
-        // Normalisasi delta angle
-        if (deltaAngle > Math.PI) deltaAngle -= Math.PI * 2;
-        if (deltaAngle < -Math.PI) deltaAngle += Math.PI * 2;
-
-        // Terapkan sensitivitas
-        deltaAngle *= this.rotationSensitivity;
-
-        // Update rotasi komponen
-        let newRotation = this.selectedComponent.rotation + deltaAngle;
-
-        // Pastikan rotasi tetap dalam range yang valid
-        while (newRotation < 0) newRotation += Math.PI * 2;
-        while (newRotation >= Math.PI * 2) newRotation -= Math.PI * 2;
-
-        this.selectedComponent.updateRotation(newRotation);
-        this.lastRotationAngle = currentAngle;
-
-        this.draw();
-      } else if (this.isDragging && this.selectedComponent) {
-        const dx = x - this.lastMouseX;
-        const dy = y - this.lastMouseY;
-        this.selectedComponent.updatePosition(dx, dy);
-        this.lastMouseX = x;
-        this.lastMouseY = y;
-        this.draw();
-      } else if (this.connecting) {
-        this.draw();
-        this.ctx.beginPath();
-        this.ctx.strokeStyle = "#000";
-        this.ctx.moveTo(this.connecting.start.x, this.connecting.start.y);
-        this.ctx.lineTo(x, y);
-        this.ctx.stroke();
-      }
-
-      // Update cursor
-      let onRotationHandle = false;
-      let onConnectionPoint = false;
-      this.components.forEach((component) => {
-        if (component.isRotationHandleClicked(x, y)) {
-          onRotationHandle = true;
-        }
-        component.connectionPoints.forEach((point) => {
-          if (Math.hypot(x - point.x, y - point.y) < 5) {
-            onConnectionPoint = true;
-          }
-        });
-      });
-      this.canvas.style.cursor = onRotationHandle
-        ? "grab"
-        : onConnectionPoint
-        ? "crosshair"
-        : "default";
-    });
-
-    this.canvas.addEventListener("mouseup", (e) => {
-      if (this.connecting) {
-        const rect = this.canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        this.components.forEach((component) => {
-          component.connectionPoints.forEach((point, index) => {
-            if (Math.hypot(x - point.x, y - point.y) < 5) {
-              const wire = {
-                start: {
-                  x: this.connecting.start.x,
-                  y: this.connecting.start.y,
-                  component: this.connecting.component,
-                  originalIndex: this.connecting.pointIndex,
-                },
-                end: {
-                  x: point.x,
-                  y: point.y,
-                  component: component,
-                  originalIndex: index,
-                },
-              };
-
-              this.wires.push(wire);
-              this.connecting.component.connectedWires.push(wire);
-              component.connectedWires.push(wire);
-            }
-          });
-        });
-        this.connecting = null;
-      }
-
-      this.isDragging = false;
-      this.isRotating = false;
-      this.lastRotationAngle = undefined;
-      this.draw();
-    });
-
-    // Update event listener untuk toggle switch
-    this.canvas.addEventListener("click", (e) => {
-      const rect = this.canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-
-      this.components.forEach((component) => {
-        if (component.type === "switch" && component.isPointInside(x, y)) {
-          // Cek apakah klik pada area tombol switch
-          const dx = x - component.x;
-          const dy = y - component.y;
-          const rotatedX =
-            dx * Math.cos(-component.rotation) -
-            dy * Math.sin(-component.rotation);
-
-          // Area tombol switch
-          if (Math.abs(rotatedX) <= 15) {
-            component.toggleSwitch();
-            this.updateCircuit();
-          }
-        }
-      });
-    });
-  }
-
-  setupDeleteFeature() {
-    // Listener untuk tombol Delete
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Delete" && this.selectedComponent) {
-        this.deleteComponent(this.selectedComponent);
-      }
-    });
-
-    // Listener untuk context menu (klik kanan)
-    this.canvas.addEventListener("contextmenu", (e) => {
-      e.preventDefault();
-      const rect = this.canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-
-      // Cek apakah klik kanan pada komponen
-      this.components.forEach((component) => {
-        if (component.isPointInside(x, y)) {
-          this.deleteComponent(component);
-        }
-      });
-    });
-  }
-
-  deleteComponent(component) {
-    // Hapus semua wire yang terhubung
-    component.connectedWires.forEach((wire) => {
-      // Hapus wire dari array wires
-      const wireIndex = this.wires.indexOf(wire);
-      if (wireIndex > -1) {
-        this.wires.splice(wireIndex, 1);
-      }
-
-      // Hapus wire dari komponen yang terhubung
-      const otherComponent =
-        wire.start.component === component
-          ? wire.end.component
-          : wire.start.component;
-
-      if (otherComponent) {
-        const otherWireIndex = otherComponent.connectedWires.indexOf(wire);
-        if (otherWireIndex > -1) {
-          otherComponent.connectedWires.splice(otherWireIndex, 1);
-        }
-      }
-    });
-
-    // Bersihkan interval jika komponen adalah flasher
-    if (component.type === "flasher") {
-      component.stopFlashing();
-      this.flashers.delete(component);
+        component.remove();
+        updatePowerState();
     }
 
-    // Hapus komponen dari array
-    const index = this.components.indexOf(component);
-    if (index > -1) {
-      this.components.splice(index, 1);
-    }
+    function handleMouseDown(e) {
+        if (e.button !== 0) return; // Only handle left mouse button
+        if (e.target.classList.contains('voltage-input')) return; // Don't drag when adjusting voltage
+        if (e.target.classList.contains('connection-point')) return; // Don't drag when clicking connection points
+        if (e.target.classList.contains('turn-switch-button')) return; // Don't drag when clicking switch buttons
+        
+        const component = e.currentTarget;
+        let isDragging = true;
+        let startX = e.clientX - component.offsetLeft;
+        let startY = e.clientY - component.offsetTop;
 
-    // Reset selected component jika yang dihapus adalah komponen yang dipilih
-    if (this.selectedComponent === component) {
-      this.selectedComponent = null;
-    }
+        function handleMouseMove(e) {
+            if (!isDragging) return;
 
-    // Update circuit dan redraw
-    this.updateCircuit();
-    this.draw();
-  }
+            const newX = e.clientX - startX;
+            const newY = e.clientY - startY;
 
-  draw() {
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            component.style.left = `${newX}px`;
+            component.style.top = `${newY}px`;
 
-    // Gambar wire
-    this.wires.forEach((wire) => {
-      this.ctx.beginPath();
-      this.ctx.strokeStyle =
-        wire.start.isPowered || wire.end.isPowered
-          ? "rgba(255, 235, 59, 0.8)"
-          : "#000";
-      this.ctx.lineWidth = 2;
-      this.ctx.moveTo(wire.start.x, wire.start.y);
-      this.ctx.lineTo(wire.end.x, wire.end.y);
-      this.ctx.stroke();
-
-      // Tambah efek glow untuk wire yang aktif
-      if (wire.start.isPowered || wire.end.isPowered) {
-        this.ctx.beginPath();
-        this.ctx.strokeStyle = "rgba(255, 235, 59, 0.3)";
-        this.ctx.lineWidth = 4;
-        this.ctx.moveTo(wire.start.x, wire.start.y);
-        this.ctx.lineTo(wire.end.x, wire.end.y);
-        this.ctx.stroke();
-      }
-    });
-
-    // Gambar komponen
-    this.components.forEach((component) => component.draw(this.ctx));
-  }
-
-  updateCircuit() {
-    // Reset status listrik semua komponen kecuali battery
-    this.components.forEach((component) => {
-      if (component.type !== "battery") {
-        component.isPowered = false;
-        component.connectionPoints.forEach(
-          (point) => (point.isPowered = false)
-        );
-      }
-    });
-
-    // Mulai dari battery
-    const batteries = this.components.filter((c) => c.type === "battery");
-    batteries.forEach((battery) => {
-      battery.isPowered = true;
-      battery.connectionPoints.forEach((point) => (point.isPowered = true));
-      this.propagatePower(battery, new Set());
-    });
-
-    this.draw();
-  }
-
-  propagatePower(component, visited = new Set(), flasherState = null) {
-    if (visited.has(component)) return;
-    visited.add(component);
-
-    // Set komponen sebagai powered
-    component.isPowered = true;
-
-    // Jika ada flasher state yang sedang aktif, terapkan ke komponen
-    if (flasherState !== null) {
-      component.isFlashing = true;
-      component.flashState = flasherState;
-    }
-
-    if (component.type === "flasher") {
-      if (component.isPowered) {
-        component.startFlashing();
-        this.flashers.add(component);
-        flasherState = component.flashState; // Set flasher state untuk propagasi
-      }
-    }
-
-    // Handle different component types
-    if (component.type === "directionSwitch") {
-      if (component.isOn && component.selectedDirection !== "none") {
-        // Tentukan output yang aktif
-        let activeOutputIndex;
-        switch (component.selectedDirection) {
-          case "left":
-            activeOutputIndex = 1;
-            break;
-          case "center":
-            activeOutputIndex = 2;
-            break;
-          case "right":
-            activeOutputIndex = 3;
-            break;
+            // Update connected wires
+            const points = component.querySelectorAll('.connection-point');
+            points.forEach(point => {
+                connections.forEach(conn => {
+                    if (conn.startPoint === point || conn.endPoint === point) {
+                        updateWirePosition(conn);
+                    }
+                });
+            });
         }
 
-        // Propagasi ke output yang aktif saja
-        component.connectedWires.forEach((wire) => {
-          let nextComponent, nextPoint;
+        function handleMouseUp() {
+            isDragging = false;
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        }
 
-          if (wire.start.component === component) {
-            if (wire.start.originalIndex === activeOutputIndex) {
-              nextComponent = wire.end.component;
-              nextPoint = wire.end;
-            }
-          } else if (wire.end.component === component) {
-            if (wire.end.originalIndex === activeOutputIndex) {
-              nextComponent = wire.start.component;
-              nextPoint = wire.start;
-            }
-          }
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+    }
 
-          if (nextComponent && !visited.has(nextComponent)) {
-            nextPoint.isPowered = true;
-            this.propagatePower(nextComponent, visited, flasherState);
-          }
-        });
-      }
-    } else if (component.type === "switch") {
-      // Untuk switch biasa
-      if (component.switchState) {
-        component.connectedWires.forEach((wire) => {
-          let nextComponent, nextPoint;
+    // Connection management
+    function handleConnectionPointClick(e) {
+        e.stopPropagation();
+        const point = e.target;
 
-          if (wire.start.component === component) {
-            nextComponent = wire.end.component;
-            nextPoint = wire.end;
-          } else {
-            nextComponent = wire.start.component;
-            nextPoint = wire.start;
-          }
-
-          if (nextComponent && !visited.has(nextComponent)) {
-            nextPoint.isPowered = true;
-            this.propagatePower(nextComponent, visited, flasherState);
-          }
-        });
-      }
-    } else {
-      // Untuk komponen lain (battery, lamp, dll)
-      component.connectedWires.forEach((wire) => {
-        let nextComponent, nextPoint;
-
-        if (wire.start.component === component) {
-          nextComponent = wire.end.component;
-          nextPoint = wire.end;
+        if (!selectedPoint) {
+            selectedPoint = point;
+            point.classList.add('selected');
         } else {
-          nextComponent = wire.start.component;
-          nextPoint = wire.start;
-        }
+            // Check if trying to connect to self
+            if (selectedPoint === point) {
+                selectedPoint.classList.remove('selected');
+                selectedPoint = null;
+                return;
+            }
 
-        if (nextComponent && !visited.has(nextComponent)) {
-          nextPoint.isPowered = true;
-          this.propagatePower(nextComponent, visited, flasherState);
+            // Check if points are on the same component
+            const selectedComponent = selectedPoint.closest('.component');
+            const targetComponent = point.closest('.component');
+            if (selectedComponent === targetComponent) {
+                selectedPoint.classList.remove('selected');
+                selectedPoint = null;
+                return;
+            }
+
+            // Show color picker before creating connection
+            showWireColorPicker(selectedPoint, point);
         }
-      });
     }
-  }
 
-  updateFlashingLamps() {
-    this.flashers.forEach((flasher) => {
-      if (flasher.isPowered) {
-        const visited = new Set();
-        this.propagateFlashState(flasher, flasher.flashState, visited);
-      }
-    });
-    this.draw();
-  }
-
-  propagateFlashState(component, state, visited) {
-    if (visited.has(component)) return;
-    visited.add(component);
-
-    // Update flash state untuk komponen yang sedang aktif
-    if (component.isPowered) {
-      component.flashState = state;
-
-      // Khusus untuk directionSwitch
-      if (component.type === "directionSwitch") {
-        if (component.isOn && component.selectedDirection !== "none") {
-          let activeOutputIndex;
-          switch (component.selectedDirection) {
-            case "left":
-              activeOutputIndex = 1;
-              break;
-            case "center":
-              activeOutputIndex = 2;
-              break;
-            case "right":
-              activeOutputIndex = 3;
-              break;
-          }
-
-          component.connectedWires.forEach((wire) => {
-            let nextComponent;
-            if (wire.start.component === component) {
-              if (wire.start.originalIndex === activeOutputIndex) {
-                nextComponent = wire.end.component;
-              }
-            } else if (wire.end.component === component) {
-              if (wire.end.originalIndex === activeOutputIndex) {
-                nextComponent = wire.start.component;
-              }
-            }
-
-            if (nextComponent && !visited.has(nextComponent)) {
-              this.propagateFlashState(nextComponent, state, visited);
-            }
-          });
-        }
-      } else {
-        // Untuk komponen lain
-        component.connectedWires.forEach((wire) => {
-          let nextComponent;
-          if (wire.start.component === component) {
-            nextComponent = wire.end.component;
-          } else {
-            nextComponent = wire.start.component;
-          }
-
-          if (nextComponent && !visited.has(nextComponent)) {
-            this.propagateFlashState(nextComponent, state, visited);
-          }
+    // Wire color picker
+    function showWireColorPicker(startPoint, endPoint) {
+        // Create color picker container
+        const colorPicker = document.createElement('div');
+        colorPicker.className = 'color-picker';
+        colorPicker.style.position = 'fixed';
+        colorPicker.style.zIndex = '1000';
+        
+        // Position in the middle of the screen
+        colorPicker.style.top = '50%';
+        colorPicker.style.left = '50%';
+        colorPicker.style.transform = 'translate(-50%, -50%)';
+        
+        // Style the color picker
+        colorPicker.style.backgroundColor = 'white';
+        colorPicker.style.padding = '15px';
+        colorPicker.style.borderRadius = '8px';
+        colorPicker.style.boxShadow = '0 0 10px rgba(0,0,0,0.3)';
+        
+        // Add title
+        const title = document.createElement('h3');
+        title.textContent = 'Pilih Warna Kabel';
+        title.style.margin = '0 0 10px 0';
+        title.style.textAlign = 'center';
+        colorPicker.appendChild(title);
+        
+        // Create color picker content
+        const colorPickerContent = document.createElement('div');
+        colorPickerContent.className = 'color-picker-content';
+        colorPickerContent.style.display = 'grid';
+        colorPickerContent.style.gridTemplateColumns = 'repeat(3, 1fr)';
+        colorPickerContent.style.gap = '10px';
+        
+        // Available wire colors
+        const wireColors = [
+            { name: 'Merah', value: '#ff0000' },
+            { name: 'Hitam', value: '#000000' },
+            { name: 'Biru', value: '#0000ff' },
+            { name: 'Hijau', value: '#00ff00' },
+            { name: 'Kuning', value: '#ffff00' },
+            { name: 'Oranye', value: '#ffa500' }
+        ];
+        
+        // Create color buttons
+        wireColors.forEach(color => {
+            const colorButton = document.createElement('button');
+            colorButton.className = 'color-button';
+            colorButton.style.width = '60px';
+            colorButton.style.height = '30px';
+            colorButton.style.backgroundColor = color.value;
+            colorButton.style.border = '2px solid #ccc';
+            colorButton.style.borderRadius = '4px';
+            colorButton.style.cursor = 'pointer';
+            colorButton.style.display = 'flex';
+            colorButton.style.flexDirection = 'column';
+            colorButton.style.alignItems = 'center';
+            colorButton.style.justifyContent = 'center';
+            
+            // Add color name
+            const colorName = document.createElement('span');
+            colorName.textContent = color.name;
+            colorName.style.fontSize = '10px';
+            colorName.style.marginTop = '5px';
+            colorName.style.color = color.value === '#000000' ? 'white' : 'black';
+            colorButton.appendChild(colorName);
+            
+            // Handle color selection
+            colorButton.addEventListener('click', () => {
+                createConnection(startPoint, endPoint, color.value);
+                document.body.removeChild(colorPicker);
+                
+                // Reset selection
+                selectedPoint.classList.remove('selected');
+                selectedPoint = null;
+                
+                // Update power state after new connection
+                updatePowerState();
+            });
+            
+            colorPickerContent.appendChild(colorButton);
         });
-      }
+        
+        colorPicker.appendChild(colorPickerContent);
+        
+        // Add cancel button
+        const cancelButton = document.createElement('button');
+        cancelButton.textContent = 'Batal';
+        cancelButton.style.marginTop = '15px';
+        cancelButton.style.padding = '5px 10px';
+        cancelButton.style.backgroundColor = '#f8f9fa';
+        cancelButton.style.border = '1px solid #ddd';
+        cancelButton.style.borderRadius = '4px';
+        cancelButton.style.cursor = 'pointer';
+        cancelButton.style.display = 'block';
+        cancelButton.style.width = '100%';
+        
+        cancelButton.addEventListener('click', () => {
+            document.body.removeChild(colorPicker);
+            selectedPoint.classList.remove('selected');
+            selectedPoint = null;
+        });
+        
+        colorPicker.appendChild(cancelButton);
+        
+        // Add to document
+        document.body.appendChild(colorPicker);
     }
-  }
 
-  destroy() {
-    // Bersihkan semua interval saat circuit dihancurkan
-    this.components.forEach((component) => {
-      if (component.type === "flasher") {
-        component.stopFlashing();
-      }
-    });
-  }
-}
+    function createConnection(startPoint, endPoint, wireColor = '#000000') {
+        const wire = document.createElement('div');
+        wire.className = 'wire';
+        wire.style.backgroundColor = wireColor;
+        workspaceArea.appendChild(wire);
+        
+        const connection = {
+            startPoint,
+            endPoint,
+            wire,
+            color: wireColor
+        };
+        
+        connections.push(connection);
+        updateWirePosition(connection);
+    }
 
-// Inisialisasi
-document.addEventListener("DOMContentLoaded", () => {
-  const canvas = document.getElementById("workArea");
-  const circuit = new Circuit(canvas);
+    function updateWirePosition(connection) {
+        const startRect = connection.startPoint.getBoundingClientRect();
+        const endRect = connection.endPoint.getBoundingClientRect();
+        const workspaceRect = workspaceArea.getBoundingClientRect();
 
-  // Setup drag and drop untuk komponen
-  document.querySelectorAll(".component").forEach((el) => {
-    el.addEventListener("dragstart", (e) => {
-      e.dataTransfer.setData("text/plain", el.dataset.type);
-    });
-  });
+        const startX = startRect.left + startRect.width / 2 - workspaceRect.left;
+        const startY = startRect.top + startRect.height / 2 - workspaceRect.top;
+        const endX = endRect.left + endRect.width / 2 - workspaceRect.left;
+        const endY = endRect.top + endRect.height / 2 - workspaceRect.top;
+
+        const deltaX = endX - startX;
+        const deltaY = endY - startY;
+        const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        const angle = Math.atan2(deltaY, deltaX);
+
+        connection.wire.style.left = `${startX}px`;
+        connection.wire.style.top = `${startY}px`;
+        connection.wire.style.width = `${length}px`;
+        connection.wire.style.transform = `rotate(${angle}rad)`;
+    }
+
+    // Blinking functionality
+    function startBlinking() {
+        if (blinkInterval) {
+            clearInterval(blinkInterval);
+        }
+        
+        blinkInterval = setInterval(() => {
+            blinkState = !blinkState;
+            
+            // Update all blinking elements
+            const blinkingLights = workspaceArea.querySelectorAll('.light-bulb.blinking');
+            const blinkingWires = workspaceArea.querySelectorAll('.wire.blinking');
+            
+            blinkingLights.forEach(light => {
+                if (blinkState) {
+                    light.classList.add('powered');
+                } else {
+                    light.classList.remove('powered');
+                }
+            });
+            
+            blinkingWires.forEach(wire => {
+                if (blinkState) {
+                    wire.classList.add('powered');
+                } else {
+                    wire.classList.remove('powered');
+                }
+            });
+        }, 500); // 500ms for a 1-second cycle (on for 500ms, off for 500ms)
+    }
+
+    function stopBlinking() {
+        if (blinkInterval) {
+            clearInterval(blinkInterval);
+            blinkInterval = null;
+        }
+        
+        // Reset all blinking elements
+        const blinkingLights = workspaceArea.querySelectorAll('.light-bulb.blinking');
+        const blinkingWires = workspaceArea.querySelectorAll('.wire.blinking');
+        
+        blinkingLights.forEach(light => {
+            light.classList.remove('powered');
+            light.classList.remove('blinking');
+        });
+        
+        blinkingWires.forEach(wire => {
+            wire.classList.remove('powered');
+            wire.classList.remove('blinking');
+        });
+    }
+
+    // Circuit analysis and power state management
+    function updatePowerState() {
+        // First, stop any existing blinking
+        stopBlinking();
+        
+        // Reset all powered states
+        const allLights = workspaceArea.querySelectorAll('.light-bulb');
+        const allWires = workspaceArea.querySelectorAll('.wire');
+        
+        allLights.forEach(light => {
+            light.classList.remove('powered');
+            light.classList.remove('blinking');
+        });
+        
+        allWires.forEach(wire => {
+            wire.classList.remove('powered');
+            wire.classList.remove('blinking');
+        });
+        
+        // Check if any turn signal is active
+        const anyTurnSignalActive = turnStates.left || turnStates.right;
+        
+        if (!anyTurnSignalActive) {
+            showDebugMessage('Tidak ada sein yang aktif. Aktifkan saklar sein kiri atau kanan.');
+            return;
+        }
+        
+        // Start the circuit analysis
+        const batteries = Array.from(workspaceArea.querySelectorAll('.battery'));
+        const lights = Array.from(workspaceArea.querySelectorAll('.light'));
+        const flashers = Array.from(workspaceArea.querySelectorAll('.flasher'));
+        const swSeins = Array.from(workspaceArea.querySelectorAll('.sw-sein')); 
+        const sockets = Array.from(workspaceArea.querySelectorAll('.socket'));
+        const fuses = Array.from(workspaceArea.querySelectorAll('.fuse'));
+        
+        // Debug variables to track circuit completion
+        let circuitComplete = false;
+        let blinkingElementsAdded = false;
+        
+        // Check if we have the minimum required components
+        if (batteries.length === 0 || lights.length === 0) {
+            let missingComponents = [];
+            if (batteries.length === 0) missingComponents.push("Baterai");
+            if (lights.length === 0) missingComponents.push("Lampu");
+            
+            const message = `Komponen tidak lengkap. Tambahkan: ${missingComponents.join(', ')}`;
+            showDebugMessage(message);
+            return;
+        }
+        
+        // Track powered components
+        const poweredComponents = new Set();
+        
+        // Analyze the circuit
+        batteries.forEach(battery => {
+            const voltage = parseFloat(battery.querySelector('.voltage-input').value) || 0;
+            
+            // Check if voltage is at least 12V
+            if (voltage < 12) {
+                showDebugMessage('Tegangan baterai kurang dari 12V. Atur tegangan baterai minimal 12V');
+                return;
+            }
+            
+            // Get battery terminals
+            const batteryPositive = battery.querySelector('.connection-point.positive');
+            
+            if (!batteryPositive) {
+                showDebugMessage('Terminal positif baterai tidak ditemukan');
+                return;
+            }
+            
+            // Add battery to powered components
+            poweredComponents.add(battery);
+            
+            // Check all connections from battery
+            const batteryConnections = connections.filter(conn => conn.startPoint === batteryPositive);
+            
+            if (batteryConnections.length === 0) {
+                showDebugMessage('Baterai tidak terhubung ke komponen lain');
+                return;
+            }
+            
+            // Power all connections from battery
+            batteryConnections.forEach(conn => {
+                conn.wire.classList.add('powered');
+                const endComponent = conn.endPoint.closest('.component');
+                if (endComponent) {
+                    poweredComponents.add(endComponent);
+                    
+                    // If connected to fuse, follow connections from fuse
+                    if (endComponent.classList.contains('fuse')) {
+                        const fuseOutput = endComponent.querySelector('.connection-point.output');
+                        const fuseConnections = connections.filter(c => c.startPoint === fuseOutput);
+                        
+                        fuseConnections.forEach(fuseConn => {
+                            fuseConn.wire.classList.add('powered');
+                            const fuseEndComponent = fuseConn.endPoint.closest('.component');
+                            if (fuseEndComponent) {
+                                poweredComponents.add(fuseEndComponent);
+                            }
+                        });
+                    }
+                }
+            });
+            
+            // Check if flashers are powered
+            flashers.forEach(flasher => {
+                if (poweredComponents.has(flasher)) {
+                    const flasherOutput = flasher.querySelector('.connection-point.output');
+                    const flasherConnections = connections.filter(conn => conn.startPoint === flasherOutput);
+                    
+                    flasherConnections.forEach(conn => {
+                        conn.wire.classList.add('powered');
+                        conn.wire.classList.add('blinking');
+                        
+                        const endComponent = conn.endPoint.closest('.component');
+                        if (endComponent) {
+                            poweredComponents.add(endComponent);
+                            
+                            // If connected directly to light
+                            if (endComponent.classList.contains('light')) {
+                                const lightBulb = endComponent.querySelector('.light-bulb');
+                                if (lightBulb) {
+                                    lightBulb.classList.add('blinking');
+                                    blinkingElementsAdded = true;
+                                }
+                            }
+                            
+                            // If connected to SW Sein
+                            if (endComponent.classList.contains('sw-sein')) {
+                                // Get the active output based on turn states
+                                const leftOutput = endComponent.querySelector('.connection-point.left-output');
+                                const rightOutput = endComponent.querySelector('.connection-point.right-output');
+                                
+                                // Check connections from SW Sein outputs based on active turn signals
+                                connections.forEach(swConn => {
+                                    if ((swConn.startPoint === leftOutput && turnStates.left) || 
+                                        (swConn.startPoint === rightOutput && turnStates.right)) {
+                                        
+                                        swConn.wire.classList.add('powered');
+                                        swConn.wire.classList.add('blinking');
+                                        
+                                        const swEndComponent = swConn.endPoint.closest('.component');
+                                        if (swEndComponent && swEndComponent.classList.contains('light')) {
+                                            const lightBulb = swEndComponent.querySelector('.light-bulb');
+                                            if (lightBulb) {
+                                                lightBulb.classList.add('blinking');
+                                                blinkingElementsAdded = true;
+                                            }
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                    });
+                }
+            });
+            
+            // Check if SW Seins are powered directly
+            swSeins.forEach(swSein => {
+                if (poweredComponents.has(swSein)) {
+                    // Get the active output based on turn states
+                    const leftOutput = swSein.querySelector('.connection-point.left-output');
+                    const rightOutput = swSein.querySelector('.connection-point.right-output');
+                    
+                    // Check connections from SW Sein outputs based on active turn signals
+                    connections.forEach(conn => {
+                        if ((conn.startPoint === leftOutput && turnStates.left) || 
+                            (conn.startPoint === rightOutput && turnStates.right)) {
+                            
+                            conn.wire.classList.add('powered');
+                            
+                            const endComponent = conn.endPoint.closest('.component');
+                            if (endComponent) {
+                                poweredComponents.add(endComponent);
+                                
+                                // If connected to light
+                                if (endComponent.classList.contains('light')) {
+                                    conn.wire.classList.add('blinking');
+                                    const lightBulb = endComponent.querySelector('.light-bulb');
+                                    if (lightBulb) {
+                                        lightBulb.classList.add('blinking');
+                                        blinkingElementsAdded = true;
+                                    }
+                                }
+                                
+                                // If connected to flasher
+                                if (endComponent.classList.contains('flasher')) {
+                                    const flasherOutput = endComponent.querySelector('.connection-point.output');
+                                    const flasherConnections = connections.filter(c => c.startPoint === flasherOutput);
+                                    
+                                    flasherConnections.forEach(flasherConn => {
+                                        flasherConn.wire.classList.add('powered');
+                                        flasherConn.wire.classList.add('blinking');
+                                        
+                                        const flasherEndComponent = flasherConn.endPoint.closest('.component');
+                                        if (flasherEndComponent && flasherEndComponent.classList.contains('light')) {
+                                            const lightBulb = flasherEndComponent.querySelector('.light-bulb');
+                                            if (lightBulb) {
+                                                lightBulb.classList.add('blinking');
+                                                blinkingElementsAdded = true;
+                                            }
+                                        }
+                                    });
+                                }
+                            }
+                        }
+                    });
+                }
+            });
+        });
+        
+        // If blinking elements were added, start the blinking animation
+        if (blinkingElementsAdded) {
+            startBlinking();
+            showDebugMessage('Rangkaian sein berfungsi dengan baik! ✓', true);
+        } else {
+            showDebugMessage('Rangkaian tidak lengkap atau tidak ada lampu yang berkedip. Periksa koneksi antara komponen.', false);
+        }
+    }
+
+    // Debug message display
+    function showDebugMessage(message, isSuccess = false) {
+        let debugPanel = document.getElementById('debug-panel');
+        
+        if (!debugPanel) {
+            debugPanel = document.createElement('div');
+            debugPanel.id = 'debug-panel';
+            debugPanel.style.position = 'fixed';
+            debugPanel.style.bottom = '10px';
+            debugPanel.style.left = '10px';
+            debugPanel.style.right = '10px';
+            debugPanel.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+            debugPanel.style.color = 'white';
+            debugPanel.style.padding = '10px';
+            debugPanel.style.borderRadius = '5px';
+            debugPanel.style.fontFamily = 'monospace';
+            debugPanel.style.zIndex = '1000';
+            debugPanel.style.maxHeight = '150px';
+            debugPanel.style.overflowY = 'auto';
+            document.body.appendChild(debugPanel);
+        }
+        
+        const messageElement = document.createElement('div');
+        messageElement.textContent = message;
+        messageElement.style.marginBottom = '5px';
+        
+        // Add color based on message type
+        if (isSuccess) {
+            messageElement.style.color = '#69db7c'; // Green for explicit success
+            messageElement.style.fontWeight = 'bold';
+        } else if (message.includes('tidak ditemukan') || message.includes('tidak lengkap') || message.includes('nol atau negatif')) {
+            messageElement.style.color = '#ff6b6b'; // Red for errors
+        } else if (message.includes('OK') || message.includes('berfungsi dengan baik')) {
+            messageElement.style.color = '#69db7c'; // Green for success
+        } else {
+            messageElement.style.color = '#ffd43b'; // Yellow for warnings/info
+        }
+        
+        // Clear previous messages
+        debugPanel.innerHTML = '';
+        debugPanel.appendChild(messageElement);
+    }
 });
