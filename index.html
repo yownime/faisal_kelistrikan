@@ -66,5 +66,22 @@
     </footer>
 
     <script src="script.js"></script>
+    <script>
+        // Check user registration immediately before page loads
+        if (!sessionStorage.getItem('userData')) {
+            window.location.replace('landing.html');
+        }
+
+        // Display user info if available
+        const userData = JSON.parse(sessionStorage.getItem('userData'));
+        if (userData) {
+            const welcomeMessage = document.createElement('div');
+            welcomeMessage.style.textAlign = 'center';
+            welcomeMessage.style.padding = '1rem';
+            welcomeMessage.style.color = '#fff';
+            welcomeMessage.innerHTML = `Selamat datang, ${userData.nama} | Kelas ${userData.kelas} ${userData.jurusan}`;
+            document.querySelector('.hero-content').insertBefore(welcomeMessage, document.querySelector('.hero-content p'));
+        }
+    </script>
 </body>
 </html>
