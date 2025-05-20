@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
         left: false,
         right: false
     };
+    let socketState = false;
     let blinkInterval = null;
     let blinkState = false;
 
@@ -298,6 +299,23 @@ document.addEventListener('DOMContentLoaded', () => {
         outputPoint.style.transform = 'translateY(-50%)';
         clone.appendChild(outputPoint);
         outputPoint.addEventListener('click', handleConnectionPointClick);
+
+        // Add socket switch button
+        const socketSwitch = document.createElement('button');
+        socketSwitch.className = 'socket-switch-button';
+        socketSwitch.textContent = 'OFF';
+        socketSwitch.dataset.state = 'off';
+        socketSwitch.style.padding = '4px 8px';
+        socketSwitch.style.fontSize = '12px';
+        socketSwitch.style.marginTop = '5px';
+        socketSwitch.style.width = '100%';
+        socketSwitch.style.backgroundColor = '#ff9800';
+        socketSwitch.style.color = 'white';
+        socketSwitch.style.border = 'none';
+        socketSwitch.style.borderRadius = '4px';
+        socketSwitch.style.cursor = 'pointer';
+        socketSwitch.addEventListener('click', handleSocketSwitchClick);
+        clone.appendChild(socketSwitch);
     }
 
     function addConnectionPoint(parent, className, type, extraData = null) {
@@ -621,6 +639,12 @@ document.addEventListener('DOMContentLoaded', () => {
             wire.classList.remove('blinking');
         });
         
+        // Check if socket is ON
+        if (!socketState) {
+            showDebugMessage('Kunci kontak dalam posisi OFF. Nyalakan kunci kontak terlebih dahulu.');
+            return;
+        }
+        
         // Check if any turn signal is active
         const anyTurnSignalActive = turnStates.left || turnStates.right;
         
@@ -642,10 +666,11 @@ document.addEventListener('DOMContentLoaded', () => {
         let blinkingElementsAdded = false;
         
         // Check if we have the minimum required components
-        if (batteries.length === 0 || lights.length === 0) {
+        if (batteries.length === 0 || lights.length === 0 || sockets.length === 0) {
             let missingComponents = [];
             if (batteries.length === 0) missingComponents.push("Baterai");
             if (lights.length === 0) missingComponents.push("Lampu");
+            if (sockets.length === 0) missingComponents.push("Kunci Kontak");
             
             const message = `Komponen tidak lengkap. Tambahkan: ${missingComponents.join(', ')}`;
             showDebugMessage(message);
@@ -701,40 +726,36 @@ document.addEventListener('DOMContentLoaded', () => {
                             const fuseEndComponent = fuseConn.endPoint.closest('.component');
                             if (fuseEndComponent) {
                                 poweredComponents.add(fuseEndComponent);
-                            }
-                        });
-                    }
-                }
-            });
-            
-            // Check if flashers are powered
-            flashers.forEach(flasher => {
-                if (poweredComponents.has(flasher)) {
-                    const flasherOutput = flasher.querySelector('.connection-point.output');
-                    const flasherConnections = connections.filter(conn => conn.startPoint === flasherOutput);
+                                
+                                // If connected to socket (kunci kontak)
+                                if (fuseEndComponent.classList.contains('socket')) {
+                                    const socketOutput = fuseEndComponent.querySelector('.connection-point.output');
+                                    const socketConnections = connections.filter(c => c.startPoint === socketOutput);
                     
-                    flasherConnections.forEach(conn => {
-                        conn.wire.classList.add('powered');
-                        conn.wire.classList.add('blinking');
-                        
-                        const endComponent = conn.endPoint.closest('.component');
-                        if (endComponent) {
-                            poweredComponents.add(endComponent);
+                                    socketConnections.forEach(socketConn => {
+                                        socketConn.wire.classList.add('powered');
+                                        const socketEndComponent = socketConn.endPoint.closest('.component');
+                                        if (socketEndComponent) {
+                                            poweredComponents.add(socketEndComponent);
                             
-                            // If connected directly to light
-                            if (endComponent.classList.contains('light')) {
-                                const lightBulb = endComponent.querySelector('.light-bulb');
-                                if (lightBulb) {
-                                    lightBulb.classList.add('blinking');
-                                    blinkingElementsAdded = true;
-                                }
-                            }
+                                            // If connected to flasher
+                                            if (socketEndComponent.classList.contains('flasher')) {
+                                                const flasherOutput = socketEndComponent.querySelector('.connection-point.output');
+                                                const flasherConnections = connections.filter(c => c.startPoint === flasherOutput);
+                                                
+                                                flasherConnections.forEach(flasherConn => {
+                                                    flasherConn.wire.classList.add('powered');
+                                                    flasherConn.wire.classList.add('blinking');
+                                                    
+                                                    const flasherEndComponent = flasherConn.endPoint.closest('.component');
+                                                    if (flasherEndComponent) {
+                                                        poweredComponents.add(flasherEndComponent);
                             
                             // If connected to SW Sein
-                            if (endComponent.classList.contains('sw-sein')) {
+                                                        if (flasherEndComponent.classList.contains('sw-sein')) {
                                 // Get the active output based on turn states
-                                const leftOutput = endComponent.querySelector('.connection-point.left-output');
-                                const rightOutput = endComponent.querySelector('.connection-point.right-output');
+                                                            const leftOutput = flasherEndComponent.querySelector('.connection-point.left-output');
+                                                            const rightOutput = flasherEndComponent.querySelector('.connection-point.right-output');
                                 
                                 // Check connections from SW Sein outputs based on active turn signals
                                 connections.forEach(swConn => {
@@ -757,59 +778,13 @@ document.addEventListener('DOMContentLoaded', () => {
                             }
                         }
                     });
-                }
-            });
-            
-            // Check if SW Seins are powered directly
-            swSeins.forEach(swSein => {
-                if (poweredComponents.has(swSein)) {
-                    // Get the active output based on turn states
-                    const leftOutput = swSein.querySelector('.connection-point.left-output');
-                    const rightOutput = swSein.querySelector('.connection-point.right-output');
-                    
-                    // Check connections from SW Sein outputs based on active turn signals
-                    connections.forEach(conn => {
-                        if ((conn.startPoint === leftOutput && turnStates.left) || 
-                            (conn.startPoint === rightOutput && turnStates.right)) {
-                            
-                            conn.wire.classList.add('powered');
-                            
-                            const endComponent = conn.endPoint.closest('.component');
-                            if (endComponent) {
-                                poweredComponents.add(endComponent);
-                                
-                                // If connected to light
-                                if (endComponent.classList.contains('light')) {
-                                    conn.wire.classList.add('blinking');
-                                    const lightBulb = endComponent.querySelector('.light-bulb');
-                                    if (lightBulb) {
-                                        lightBulb.classList.add('blinking');
-                                        blinkingElementsAdded = true;
-                                    }
-                                }
-                                
-                                // If connected to flasher
-                                if (endComponent.classList.contains('flasher')) {
-                                    const flasherOutput = endComponent.querySelector('.connection-point.output');
-                                    const flasherConnections = connections.filter(c => c.startPoint === flasherOutput);
-                                    
-                                    flasherConnections.forEach(flasherConn => {
-                                        flasherConn.wire.classList.add('powered');
-                                        flasherConn.wire.classList.add('blinking');
-                                        
-                                        const flasherEndComponent = flasherConn.endPoint.closest('.component');
-                                        if (flasherEndComponent && flasherEndComponent.classList.contains('light')) {
-                                            const lightBulb = flasherEndComponent.querySelector('.light-bulb');
-                                            if (lightBulb) {
-                                                lightBulb.classList.add('blinking');
-                                                blinkingElementsAdded = true;
                                             }
                                         }
                                     });
                                 }
                             }
+                        });
                         }
-                    });
                 }
             });
         });
@@ -864,5 +839,25 @@ document.addEventListener('DOMContentLoaded', () => {
         // Clear previous messages
         debugPanel.innerHTML = '';
         debugPanel.appendChild(messageElement);
+    }
+
+    // Add socket switch click handler
+    function handleSocketSwitchClick(e) {
+        e.stopPropagation();
+        const button = e.target;
+        
+        if (button.dataset.state === 'off') {
+            button.dataset.state = 'on';
+            button.textContent = 'ON';
+            button.style.backgroundColor = '#4CAF50';
+            socketState = true;
+        } else {
+            button.dataset.state = 'off';
+            button.textContent = 'OFF';
+            button.style.backgroundColor = '#ff9800';
+            socketState = false;
+        }
+        
+        updatePowerState();
     }
 });

@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const workspaceArea = document.getElementById('workspace-area');
     let selectedPoint = null;
     let connections = [];
+    let connectionPointIdCounter = 0;
     let brakeStates = {
         front: false,
         rear: false
@@ -46,7 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const voltageControl = document.createElement('div');
             voltageControl.className = 'voltage-control';
             voltageControl.innerHTML = `
-                <input type="number" min="0" max="10" step="0.1" value="7.0" class="voltage-input">
+                <input type="number" min="0" max="12" step="0.1" value="12.0" class="voltage-input">
                 <span>V</span>
             `;
             clone.appendChild(voltageControl);
@@ -58,12 +59,37 @@ document.addEventListener('DOMContentLoaded', () => {
                 let value = parseFloat(e.target.value);
                 if (isNaN(value)) value = 0;
                 if (value < 0) value = 0;
-                if (value > 10) value = 10;
+                if (value > 12) value = 12;
                 
-                const percentage = (value * 10);
+                const percentage = (value / 12) * 100;
                 batteryLevel.style.width = `${percentage}%`;
                 updatePowerState();
             });
+        } else if (this.dataset.component === 'fuse') {
+            console.log("Creating fuse component");
+            
+            // Tambahkan titik koneksi input
+            const inputPoint = document.createElement('div');
+            inputPoint.className = 'connection-point input';
+            inputPoint.dataset.type = 'input';
+            inputPoint.dataset.id = `connection-${connectionPointIdCounter++}`;
+            inputPoint.style.left = '-4px';
+            inputPoint.style.top = '50%';
+            inputPoint.style.transform = 'translateY(-50%)';
+            clone.appendChild(inputPoint);
+            
+            // Tambahkan titik koneksi output
+            const outputPoint = document.createElement('div');
+            outputPoint.className = 'connection-point output';
+            outputPoint.dataset.type = 'output';
+            outputPoint.dataset.id = `connection-${connectionPointIdCounter++}`;
+            outputPoint.style.right = '-4px';
+            outputPoint.style.top = '50%';
+            outputPoint.style.transform = 'translateY(-50%)';
+            clone.appendChild(outputPoint);
+            
+            inputPoint.addEventListener('click', handleConnectionPointClick);
+            outputPoint.addEventListener('click', handleConnectionPointClick);
         } else if (this.dataset.component === 'light') {
             const inputPoint = document.createElement('div');
             inputPoint.className = 'connection-point input';
@@ -295,6 +321,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const sockets = Array.from(workspaceArea.querySelectorAll('.socket'));
         const lights = Array.from(workspaceArea.querySelectorAll('.light'));
         const batteries = Array.from(workspaceArea.querySelectorAll('.battery'));
+        const fuses = Array.from(workspaceArea.querySelectorAll('.fuse'));
         const brakeSwitches = Array.from(workspaceArea.querySelectorAll('.brake-switch'));
 
         console.log('-------- DEBUG: CIRCUIT STATUS --------');
@@ -302,18 +329,13 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('- Sockets:', sockets.length);
         console.log('- Lights:', lights.length);
         console.log('- Batteries:', batteries.length);
+        console.log('- Fuses:', fuses.length);
         console.log('- Brake Switches:', brakeSwitches.length);
         console.log('- Total connections:', connections.length);
         
         console.log('Brake switch states:');
         console.log('- Front brake pressed:', brakeStates.front);
         console.log('- Rear brake pressed:', brakeStates.rear);
-
-        // SIMPLIFIED CIRCUIT SCHEME:
-        // Battery to Socket
-        // Socket to Brake Switch (one connection is enough)
-        // Socket/Brake Switch to Light
-        // Battery to Light
 
         batteries.forEach(battery => {
             const batteryPositive = battery.querySelector('.connection-point.positive');
@@ -325,8 +347,8 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log('- Has positive terminal:', batteryPositive !== null);
             console.log('- Has negative terminal:', batteryNegative !== null);
             
-            if (voltage <= 0) {
-                console.log('- ISSUE: Battery voltage is zero or negative');
+            if (voltage !== 12) {
+                console.log('- ISSUE: Battery voltage is not 12V');
                 return;
             }
 
@@ -340,22 +362,40 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log('- Has black point:', socketBlack !== null);
                 console.log('- Has green point:', socketGreen !== null);
 
-                // More flexible connection check - if there's any connection between battery and socket, use it
+                // Cek koneksi baterai ke socket (langsung atau melalui fuse)
                 let batteryToSocketConnection = null;
+                let hasFuse = false;
                 
                 connections.forEach(conn => {
                     const startParent = conn.startPoint.parentElement;
                     const endParent = conn.endPoint.parentElement;
                     
-                    // Check for any battery-socket connection
+                    // Cek koneksi langsung baterai-socket
                     if ((startParent === battery && endParent === socket) || 
                         (startParent === socket && endParent === battery)) {
                         batteryToSocketConnection = conn;
-                        console.log('Battery-socket connection found:', conn);
+                        console.log('Direct battery-socket connection found:', conn);
                     }
+                    
+                    // Cek koneksi melalui fuse
+                    fuses.forEach(fuse => {
+                        if ((startParent === battery && endParent === fuse) || 
+                            (startParent === fuse && endParent === battery)) {
+                            // Cek koneksi fuse ke socket
+                            connections.forEach(conn2 => {
+                                if ((conn2.startPoint.parentElement === fuse && conn2.endPoint.parentElement === socket) ||
+                                    (conn2.startPoint.parentElement === socket && conn2.endPoint.parentElement === fuse)) {
+                                    batteryToSocketConnection = conn;
+                                    hasFuse = true;
+                                    console.log('Battery-socket connection through fuse found:', conn);
+                                }
+                            });
+                        }
+                    });
                 });
                 
                 console.log('- Any battery-socket connection:', batteryToSocketConnection !== null);
+                console.log('- Connection through fuse:', hasFuse);
                 
                 if (!batteryToSocketConnection) {
                     console.log('- ISSUE: No connection between battery and socket');
@@ -560,7 +600,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const voltage = parseFloat(battery.querySelector('.voltage-input').value) || 0;
             console.log('Battery voltage:', voltage);
             
-            if (voltage <= 0) return;
+            if (voltage !== 12) {
+                console.log('Battery voltage is not 12V, no power flow');
+                return;
+            }
 
             const positiveTerminal = battery.querySelector('.connection-point.positive');
             const negativeTerminal = battery.querySelector('.connection-point.negative');
@@ -593,9 +636,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (lightBulb) {
                         console.log('Adding powered class to light bulb.');
                         lightBulb.classList.add('powered');
-                        lightBulb.style.backgroundColor = '#FFD700'; // Ensure bright yellow color
-                        lightBulb.style.boxShadow = '0 0 20px #FFD700, 0 0 40px #FFD700'; // Ensure enhanced glow effect
-                        lightBulb.style.border = '2px solid #FFA500'; // Ensure border is applied
+                        lightBulb.style.backgroundColor = '#FFD700';
+                        lightBulb.style.boxShadow = '0 0 20px #FFD700, 0 0 40px #FFD700';
+                        lightBulb.style.border = '2px solid #FFA500';
                     } else {
                         console.log('Light bulb element not found.');
                     }

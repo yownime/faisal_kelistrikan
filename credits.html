@@ -153,7 +153,20 @@
     </div>
 
     <script>
+        // Add this function to check user data
+        function checkUserData() {
+            const userData = sessionStorage.getItem('userData');
+            if (!userData) {
+                alert('Silakan masukkan data diri Anda terlebih dahulu');
+                window.location.href = 'index.html';
+                return false;
+            }
+            return true;
+        }
+
         function sendDataToSheet() {
+            if (!checkUserData()) return;
+            
             try {
                 const userData = JSON.parse(sessionStorage.getItem('userData'));
                 const quizScore = sessionStorage.getItem('quizScore');
