@@ -668,3 +668,65 @@ h2 {
 .prev-button::before {
     content: "← ";
 }
+
+/* Style untuk fuse */
+.fuse-icon {
+    position: relative;
+    width: 40px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #f8f8f8;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+}
+
+.fuse-icon img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.fuse {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-bottom: 10px;
+    background-color: white;
+}
+
+.fuse.blown .fuse-icon {
+    position: relative;
+}
+
+.fuse.blown .fuse-icon::after {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 2px;
+    background-color: red;
+    transform: rotate(45deg);
+}
+
+/* Komponen Massa */
+.massa-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: #e0e0e0;
+    border-radius: 50%;
+    border: 1.5px solid #bbb;
+    margin-right: 6px;
+}
+.component.massa {
+    background: #f4f4f4;
+    border: 1.5px solid #d1d1d1;
+}

@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let switchStates = {};
     let connectionPointIdCounter = 1;
     let wireIdCounter = 1;
+    let ignitionKeyState = false;
 
     components.forEach(component => {
         component.addEventListener('click', handleComponentClick);
@@ -24,28 +25,38 @@ document.addEventListener('DOMContentLoaded', () => {
         clone.style.top = `${centerY - clone.offsetHeight / 2}px`;
 
         // Add connection points based on component type
-        if (this.dataset.component === 'battery') {
+        if (this.dataset.component === 'massa') {
+            setupMassa(clone);
+        } else if (this.dataset.component === 'battery') {
             console.log("Creating battery component");
             
-            // Tambahkan titik koneksi output dengan ID yang benar
-            const outputPoint = document.createElement('div');
-            outputPoint.className = 'connection-point output power';
-            outputPoint.dataset.type = 'output';
-            outputPoint.dataset.id = `connection-${connectionPointIdCounter++}`; // Pastikan ada ID!
-            outputPoint.style.right = '-4px';
-            outputPoint.style.top = '50%';
-            outputPoint.style.transform = 'translateY(-50%)';
-            clone.appendChild(outputPoint);
-            
-            console.log("Created battery output point with ID:", outputPoint.dataset.id);
-            
-            outputPoint.addEventListener('click', handleConnectionPointClick);
+            // Tambahkan kutub positif (kanan atas, merah)
+            const positivePoint = document.createElement('div');
+            positivePoint.className = 'connection-point output positive';
+            positivePoint.dataset.type = 'output';
+            positivePoint.dataset.id = `connection-${connectionPointIdCounter++}`;
+            positivePoint.style.right = '-5px';
+            positivePoint.style.top = '5px';
+            positivePoint.style.backgroundColor = '#ff0000';
+            clone.appendChild(positivePoint);
+            positivePoint.addEventListener('click', handleConnectionPointClick);
 
-            // Tambahkan kontrol tegangan
+            // Tambahkan kutub negatif (kanan bawah, hitam)
+            const negativePoint = document.createElement('div');
+            negativePoint.className = 'connection-point output negative';
+            negativePoint.dataset.type = 'output';
+            negativePoint.dataset.id = `connection-${connectionPointIdCounter++}`;
+            negativePoint.style.right = '-5px';
+            negativePoint.style.bottom = '5px';
+            negativePoint.style.backgroundColor = '#000000';
+            clone.appendChild(negativePoint);
+            negativePoint.addEventListener('click', handleConnectionPointClick);
+
+            // Modifikasi kontrol tegangan
             const voltageControl = document.createElement('div');
             voltageControl.className = 'voltage-control';
             voltageControl.innerHTML = `
-                <input type="number" min="0" max="10" step="0.1" value="7.0" class="voltage-input">
+                <input type="number" min="0" max="24" step="0.1" value="12.0" class="voltage-input">
                 <span>V</span>
             `;
             clone.appendChild(voltageControl);
@@ -56,10 +67,87 @@ document.addEventListener('DOMContentLoaded', () => {
                 let value = parseFloat(e.target.value);
                 if (isNaN(value)) value = 0;
                 if (value < 0) value = 0;
-                if (value > 10) value = 10;
+                if (value > 24) value = 24;
+                
+                // Tambahkan indikator visual untuk tegangan
+                const batteryIcon = clone.querySelector('.battery-icon');
+                if (value === 12) {
+                    batteryIcon.style.borderColor = '#4CAF50'; // Hijau untuk tegangan tepat
+                    batteryIcon.style.boxShadow = '0 0 5px #4CAF50';
+                } else {
+                    batteryIcon.style.borderColor = '#ff4444'; // Merah untuk tegangan tidak tepat
+                    batteryIcon.style.boxShadow = '0 0 5px #ff4444';
+                }
                 
                 updatePowerState();
             });
+        } else if (this.dataset.component === 'fuse') {
+            console.log("Creating fuse component");
+            
+            // Tambahkan titik koneksi input
+            const inputPoint = document.createElement('div');
+            inputPoint.className = 'connection-point input';
+            inputPoint.dataset.type = 'input';
+            inputPoint.dataset.id = `connection-${connectionPointIdCounter++}`;
+            inputPoint.style.left = '-4px';
+            inputPoint.style.top = '50%';
+            inputPoint.style.transform = 'translateY(-50%)';
+            clone.appendChild(inputPoint);
+            
+            // Tambahkan titik koneksi output
+            const outputPoint = document.createElement('div');
+            outputPoint.className = 'connection-point output';
+            outputPoint.dataset.type = 'output';
+            outputPoint.dataset.id = `connection-${connectionPointIdCounter++}`;
+            outputPoint.style.right = '-4px';
+            outputPoint.style.top = '50%';
+            outputPoint.style.transform = 'translateY(-50%)';
+            clone.appendChild(outputPoint);
+            
+            inputPoint.addEventListener('click', handleConnectionPointClick);
+            outputPoint.addEventListener('click', handleConnectionPointClick);
+        } else if (this.dataset.component === 'ignition-key') {
+            console.log("Creating ignition key component");
+            
+            // Tambahkan titik koneksi input
+            const inputPoint = document.createElement('div');
+            inputPoint.className = 'connection-point input';
+            inputPoint.dataset.type = 'input';
+            inputPoint.dataset.id = `connection-${connectionPointIdCounter++}`;
+            inputPoint.style.left = '-4px';
+            inputPoint.style.top = '50%';
+            inputPoint.style.transform = 'translateY(-50%)';
+            clone.appendChild(inputPoint);
+            
+            // Tambahkan titik koneksi output
+            const outputPoint = document.createElement('div');
+            outputPoint.className = 'connection-point output';
+            outputPoint.dataset.type = 'output';
+            outputPoint.dataset.id = `connection-${connectionPointIdCounter++}`;
+            outputPoint.style.right = '-4px';
+            outputPoint.style.top = '50%';
+            outputPoint.style.transform = 'translateY(-50%)';
+            clone.appendChild(outputPoint);
+            
+            // Tambahkan tombol on/off untuk kunci kontak
+            const ignitionSwitch = document.createElement('button');
+            ignitionSwitch.className = 'ignition-switch-button';
+            ignitionSwitch.textContent = 'OFF';
+            ignitionSwitch.dataset.state = 'off';
+            ignitionSwitch.style.padding = '4px 8px';
+            ignitionSwitch.style.fontSize = '12px';
+            ignitionSwitch.style.marginTop = '5px';
+            ignitionSwitch.style.width = '100%';
+            ignitionSwitch.style.backgroundColor = '#ff9800';
+            ignitionSwitch.style.color = 'white';
+            ignitionSwitch.style.border = 'none';
+            ignitionSwitch.style.borderRadius = '4px';
+            ignitionSwitch.style.cursor = 'pointer';
+            ignitionSwitch.addEventListener('click', handleIgnitionSwitchClick);
+            clone.appendChild(ignitionSwitch);
+            
+            inputPoint.addEventListener('click', handleConnectionPointClick);
+            outputPoint.addEventListener('click', handleConnectionPointClick);
         } else if (this.dataset.component === 'headlight') {
             console.log("Creating headlight component");
             
@@ -182,6 +270,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const inputPoint = document.createElement('div');
             inputPoint.className = 'connection-point input';
             inputPoint.dataset.type = 'input';
+            inputPoint.dataset.id = `connection-${connectionPointIdCounter++}`;
             inputPoint.style.left = '-4px';
             inputPoint.style.top = '50%';
             inputPoint.style.transform = 'translateY(-50%)';
@@ -191,6 +280,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const outputPoint = document.createElement('div');
             outputPoint.className = 'connection-point output';
             outputPoint.dataset.type = 'output';
+            outputPoint.dataset.id = `connection-${connectionPointIdCounter++}`;
             outputPoint.style.right = '-4px';
             outputPoint.style.top = '50%';
             outputPoint.style.transform = 'translateY(-50%)';
@@ -273,20 +363,34 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleMouseDown(e) {
-        if (e.button !== 0) return; // Only handle left mouse button
-        if (e.target.classList.contains('voltage-input')) return; // Don't drag when adjusting voltage
-        if (e.target.classList.contains('connection-point')) return; // Don't drag when clicking connection points
-        
+        // Handle both mouse and touch events
+        if (e.button !== undefined && e.button !== 0 && !e.touches) return; // Only left mouse button or touchstart
+        if (e.target.classList.contains('voltage-input')) return;
+        if (e.target.classList.contains('connection-point')) return;
+        if (e.target.classList.contains('ignition-switch-button')) return;
+        // Add other button classes if necessary
+
+        // Prevent default touch behavior (like scrolling)
+        if (e.cancelable) {
+            e.preventDefault();
+        }
+
         const component = e.currentTarget;
         let isDragging = true;
-        let startX = e.clientX - component.offsetLeft;
-        let startY = e.clientY - component.offsetTop;
+        // Use the first touch point or mouse coordinates
+        let startX = (e.touches ? e.touches[0].clientX : e.clientX) - component.offsetLeft;
+        let startY = (e.touches ? e.touches[0].clientY : e.clientY) - component.offsetTop;
 
-        function handleMouseMove(e) {
+        function handleMove(ev) {
             if (!isDragging) return;
-
-            const newX = e.clientX - startX;
-            const newY = e.clientY - startY;
+            // Prevent default touch behavior (like scrolling)
+            if (ev.cancelable) {
+               ev.preventDefault();
+            }
+            const clientX = ev.touches ? ev.touches[0].clientX : ev.clientX;
+            const clientY = ev.touches ? ev.touches[0].clientY : ev.clientY;
+            const newX = clientX - startX;
+            const newY = clientY - startY;
 
             component.style.left = `${newX}px`;
             component.style.top = `${newY}px`;
@@ -302,14 +406,18 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        function handleMouseUp() {
+        function handleUp() {
             isDragging = false;
-            document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup', handleMouseUp);
+            document.removeEventListener('mousemove', handleMove);
+            document.removeEventListener('mouseup', handleUp);
+            document.removeEventListener('touchmove', handleMove);
+            document.removeEventListener('touchend', handleUp);
         }
 
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
+        document.addEventListener('mousemove', handleMove);
+        document.addEventListener('mouseup', handleUp);
+        document.addEventListener('touchmove', handleMove, { passive: false });
+        document.addEventListener('touchend', handleUp);
     }
 
     function showColorPicker(callback) {
@@ -354,6 +462,18 @@ document.addEventListener('DOMContentLoaded', () => {
             point.classList.add('selected');
         } else if (selectedPoint !== point && selectedPoint.dataset.type !== point.dataset.type) {
             showColorPicker(color => {
+                // Batasi koneksi ke massa hanya dari kutub negatif baterai
+                const isMassa = (selectedPoint.closest('.component')?.classList.contains('massa') || point.closest('.component')?.classList.contains('massa'));
+                if (isMassa) {
+                    // Salah satu ujung harus kutub negatif baterai
+                    const isNegBat = (selectedPoint.classList.contains('negative') || point.classList.contains('negative'));
+                    if (!isNegBat) {
+                        alert('Massa hanya boleh dihubungkan ke kutub negatif baterai!');
+                        selectedPoint.classList.remove('selected');
+                        selectedPoint = null;
+                        return;
+                    }
+                }
                 // Create wire connection
                 const wire = document.createElement('div');
                 wire.className = 'wire';
@@ -411,14 +531,51 @@ document.addEventListener('DOMContentLoaded', () => {
         // Reset semua komponen dan wire
         const wires = Array.from(workspaceArea.querySelectorAll('.wire'));
         const batteries = Array.from(workspaceArea.querySelectorAll('.battery'));
+        const fuses = Array.from(workspaceArea.querySelectorAll('.fuse'));
+        const ignitionKeys = Array.from(workspaceArea.querySelectorAll('.ignition-key'));
         const headlights = Array.from(workspaceArea.querySelectorAll('.headlight'));
         const speedometers = Array.from(workspaceArea.querySelectorAll('.speedometer'));
         const highBeamIndicators = Array.from(workspaceArea.querySelectorAll('.high-beam-indicator'));
         const highBeamSwitches = Array.from(workspaceArea.querySelectorAll('.high-beam-switch'));
         const powerSwitches = Array.from(workspaceArea.querySelectorAll('.switch:not(.high-beam-switch)'));
         
+        // Reset semua status komponen
+        wires.forEach(wire => wire.classList.remove('powered'));
+        headlights.forEach(headlight => {
+            const headlightBulb = headlight.querySelector('.headlight-bulb');
+            if (headlightBulb) {
+                headlightBulb.classList.remove('powered', 'high-beam');
+                headlightBulb.style.backgroundColor = '#777';
+                headlightBulb.style.boxShadow = 'none';
+            }
+        });
+        speedometers.forEach(speedometer => {
+            const speedoLight = speedometer.querySelector('.speedometer-light');
+            if (speedoLight) {
+                speedoLight.classList.remove('powered');
+                speedoLight.style.backgroundColor = '#777';
+                speedoLight.style.boxShadow = 'none';
+            }
+        });
+        highBeamIndicators.forEach(indicator => {
+            const indicatorLight = indicator.querySelector('.high-beam-light');
+            if (indicatorLight) {
+                indicatorLight.classList.remove('powered');
+                indicatorLight.style.backgroundColor = '#777';
+                indicatorLight.style.boxShadow = 'none';
+            }
+        });
+        
+        // Check if ignition key is ON
+        if (!ignitionKeyState) {
+            showDebugMessage('Kunci kontak dalam posisi OFF. Nyalakan kunci kontak terlebih dahulu.');
+            return;
+        }
+        
         console.log("Komponen terdeteksi:", {
             "batteries": batteries.length,
+            "fuses": fuses.length,
+            "ignitionKeys": ignitionKeys.length,
             "headlights": headlights.length,
             "speedometers": speedometers.length,
             "highBeamIndicators": highBeamIndicators.length,
@@ -427,53 +584,39 @@ document.addEventListener('DOMContentLoaded', () => {
             "wires": wires.length
         });
         
-        // Reset tampilan indikator lampu jauh
-        highBeamIndicators.forEach(indicator => {
-            const indicatorLight = indicator.querySelector('.high-beam-light');
-            if (indicatorLight) {
-                indicatorLight.classList.remove('powered');
-                indicatorLight.style.backgroundColor = '#777'; // Warna default
-                indicatorLight.style.boxShadow = 'none';
-            } else {
-                console.error("High beam indicator light element not found!");
-            }
-        });
+        // Cek tegangan baterai
+        let validVoltage = false;
+        let currentVoltage = 0;
         
-        // Periksa titik koneksi speedometer
-        speedometers.forEach((speedometer, index) => {
-            const connectionPoints = speedometer.querySelectorAll('.connection-point');
-            console.log(`Speedometer #${index+1} memiliki ${connectionPoints.length} titik koneksi`);
+        batteries.forEach(battery => {
+            const voltageInput = battery.querySelector('.voltage-input');
+            const voltage = parseFloat(voltageInput.value) || 0;
+            currentVoltage = voltage;
             
-            connectionPoints.forEach(point => {
-                console.log(`  - Titik koneksi type=${point.dataset.type}, id=${point.dataset.id}`);
-            });
-        });
-        
-        // Reset tampilan speedometer
-        speedometers.forEach(speedometer => {
-            const speedoLight = speedometer.querySelector('.speedometer-light');
-            if (speedoLight) {
-                speedoLight.classList.remove('powered');
-                speedoLight.style.backgroundColor = '#777'; // Warna default
-                speedoLight.style.boxShadow = 'none';
+            if (voltage === 12) {
+                validVoltage = true;
+                console.log("Battery voltage is correct (12V)");
+            } else if (voltage > 12) {
+                console.log(`Battery voltage is too high (${voltage}V)`);
+                showDebugMessage(`Tegangan terlalu tinggi (${voltage}V)! Fuse akan putus.`, false);
+                // Putuskan semua fuse
+                fuses.forEach(fuse => {
+                    fuse.classList.add('blown');
+                    console.log("Fuse blown due to high voltage");
+                });
+                return;
             } else {
-                console.error("Speedometer light element not found!");
+                console.log(`Battery voltage is incorrect (${voltage}V)`);
+                showDebugMessage(`Tegangan baterai harus tepat 12V (saat ini: ${voltage}V)`, false);
+                return;
             }
         });
         
-        // Reset wire dan lampu lainnya seperti sebelumnya
-        wires.forEach(wire => wire.classList.remove('powered'));
+        if (!validVoltage) {
+            return;
+        }
         
-        headlights.forEach(headlight => {
-            const headlightBulb = headlight.querySelector('.headlight-bulb');
-            if (headlightBulb) {
-                headlightBulb.classList.remove('powered', 'high-beam');
-                headlightBulb.style.backgroundColor = '';
-                headlightBulb.style.boxShadow = '';
-            }
-        });
-        
-        // Cari semua koneksi wire (kode yang sama seperti sebelumnya)
+        // Cek koneksi wire
         const wireConnections = [];
         wires.forEach(wire => {
             const sourceId = wire.dataset.source;
@@ -517,7 +660,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Daftar untuk melacak komponen yang terhubung ke daya
         const poweredComponents = new Set();
         
-        // Fungsi untuk menemukan komponen yang terhubung (kode yang sama seperti sebelumnya)
+        // Fungsi untuk menemukan komponen yang terhubung
         function traceConnections(component, visited = new Set(), pathBlocked = false) {
             if (visited.has(component)) return;
             visited.add(component);
@@ -545,6 +688,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     console.log(`Switch ${component.dataset.component} is ON, path remains open`);
                 }
+            }
+            
+            // Cek apakah komponen ini adalah fuse yang putus
+            if (component.classList.contains('fuse') && component.classList.contains('blown')) {
+                nextPathBlocked = true;
+                console.log(`Fuse is blown, blocking path`);
             }
             
             // Lanjutkan trace ke komponen lain yang terhubung
@@ -770,5 +919,37 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         
         updatePowerState();
+    }
+
+    // Add ignition switch click handler
+    function handleIgnitionSwitchClick(e) {
+        e.stopPropagation();
+        const button = e.target;
+        
+        if (button.dataset.state === 'off') {
+            button.dataset.state = 'on';
+            button.textContent = 'ON';
+            button.style.backgroundColor = '#4CAF50';
+            ignitionKeyState = true;
+        } else {
+            button.dataset.state = 'off';
+            button.textContent = 'OFF';
+            button.style.backgroundColor = '#ff9800';
+            ignitionKeyState = false;
+        }
+        
+        updatePowerState();
+    }
+
+    // Komponen Massa: hanya satu connection point (input), hanya bisa dihubungkan ke kutub negatif baterai
+    function setupMassa(clone) {
+        const inputPoint = document.createElement('div');
+        inputPoint.className = 'connection-point input';
+        inputPoint.dataset.type = 'input';
+        inputPoint.style.left = '-4px';
+        inputPoint.style.top = '50%';
+        inputPoint.style.transform = 'translateY(-50%)';
+        clone.appendChild(inputPoint);
+        inputPoint.addEventListener('click', handleConnectionPointClick);
     }
 });

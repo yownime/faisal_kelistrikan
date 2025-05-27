@@ -32,8 +32,6 @@ body {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-
-
 h2 {
     margin-bottom: 20px;
     color: #333;
@@ -823,4 +821,22 @@ h2 {
 
 .connection-point.right-output {
     background-color: #9C27B0; /* Purple for right */
+}
+
+/* Komponen Massa */
+.massa-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: #e0e0e0;
+    border-radius: 50%;
+    border: 1.5px solid #bbb;
+    margin-right: 6px;
+}
+
+.component.massa {
+    background: #f4f4f4;
+    border: 1.5px solid #d1d1d1;
 }
