@@ -35,6 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Add event listeners for component manipulation
         clone.addEventListener('mousedown', handleMouseDown);
+        clone.addEventListener('touchstart', handleMouseDown, { passive: false });
         clone.addEventListener('contextmenu', handleContextMenu);
         workspaceArea.appendChild(clone);
     }
@@ -58,6 +59,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
             case 'socket':
                 setupSocket(clone);
+                break;
+            case 'massa':
+                setupMassa(clone);
                 break;
         }
     }
@@ -318,6 +322,17 @@ document.addEventListener('DOMContentLoaded', () => {
         clone.appendChild(socketSwitch);
     }
 
+    function setupMassa(clone) {
+        const inputPoint = document.createElement('div');
+        inputPoint.className = 'connection-point input';
+        inputPoint.dataset.type = 'input';
+        inputPoint.style.left = '-4px';
+        inputPoint.style.top = '50%';
+        inputPoint.style.transform = 'translateY(-50%)';
+        clone.appendChild(inputPoint);
+        inputPoint.addEventListener('click', handleConnectionPointClick);
+    }
+
     function addConnectionPoint(parent, className, type, extraData = null) {
         const point = document.createElement('div');
         point.className = className;
@@ -352,21 +367,33 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleMouseDown(e) {
-        if (e.button !== 0) return; // Only handle left mouse button
-        if (e.target.classList.contains('voltage-input')) return; // Don't drag when adjusting voltage
-        if (e.target.classList.contains('connection-point')) return; // Don't drag when clicking connection points
-        if (e.target.classList.contains('turn-switch-button')) return; // Don't drag when clicking switch buttons
-        
+        // Handle both mouse and touch events
+        if (e.button !== undefined && e.button !== 0 && !e.touches) return; // Only left mouse button or touchstart
+        if (e.target.classList.contains('voltage-input')) return;
+        if (e.target.classList.contains('connection-point')) return;
+        if (e.target.classList.contains('turn-switch-button')) return;
+
+        // Prevent default touch behavior (like scrolling)
+        if (e.cancelable) {
+            e.preventDefault();
+        }
+
         const component = e.currentTarget;
         let isDragging = true;
-        let startX = e.clientX - component.offsetLeft;
-        let startY = e.clientY - component.offsetTop;
+        // Use the first touch point or mouse coordinates
+        let startX = (e.touches ? e.touches[0].clientX : e.clientX) - component.offsetLeft;
+        let startY = (e.touches ? e.touches[0].clientY : e.clientY) - component.offsetTop;
 
-        function handleMouseMove(e) {
+        function handleMove(ev) {
             if (!isDragging) return;
-
-            const newX = e.clientX - startX;
-            const newY = e.clientY - startY;
+            // Prevent default touch behavior (like scrolling)
+            if (ev.cancelable) {
+               ev.preventDefault();
+            }
+            const clientX = ev.touches ? ev.touches[0].clientX : ev.clientX;
+            const clientY = ev.touches ? ev.touches[0].clientY : ev.clientY;
+            const newX = clientX - startX;
+            const newY = clientY - startY;
 
             component.style.left = `${newX}px`;
             component.style.top = `${newY}px`;
@@ -382,14 +409,18 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        function handleMouseUp() {
+        function handleUp() {
             isDragging = false;
-            document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup', handleMouseUp);
+            document.removeEventListener('mousemove', handleMove);
+            document.removeEventListener('mouseup', handleUp);
+            document.removeEventListener('touchmove', handleMove);
+            document.removeEventListener('touchend', handleUp);
         }
 
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
+        document.addEventListener('mousemove', handleMove);
+        document.addEventListener('mouseup', handleUp);
+        document.addEventListener('touchmove', handleMove, { passive: false });
+        document.addEventListener('touchend', handleUp);
     }
 
     // Connection management
@@ -490,6 +521,16 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Handle color selection
             colorButton.addEventListener('click', () => {
+                // Batasi koneksi ke massa hanya dari kutub negatif baterai
+                const isMassa = (startPoint.closest('.component')?.classList.contains('massa') || endPoint.closest('.component')?.classList.contains('massa'));
+                if (isMassa) {
+                    // Salah satu ujung harus kutub negatif baterai
+                    const isNegBat = (startPoint.classList.contains('negative') || endPoint.classList.contains('negative'));
+                    if (!isNegBat) {
+                        alert('Massa hanya boleh dihubungkan ke kutub negatif baterai!');
+                        return;
+                    }
+                }
                 createConnection(startPoint, endPoint, color.value);
                 document.body.removeChild(colorPicker);
                 
